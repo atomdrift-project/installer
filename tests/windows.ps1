@@ -128,6 +128,10 @@ public static class FixtureTwo {
 		Copy-Item -LiteralPath $fixtureOne -Destination (Join-Path $mockBuilt 'atomscan.exe') -Force
 		$global:LASTEXITCODE = 0
 	}
+	function rustc {
+		Write-Output 'rustc 1.94.0 (test toolchain)'
+		$global:LASTEXITCODE = 0
+	}
 
 	$Version = '2.5.0'
 	$Force = $true
@@ -149,6 +153,7 @@ public static class FixtureTwo {
 } finally {
 	Remove-Item Function:\git -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\cargo -Force -ErrorAction SilentlyContinue
+	Remove-Item Function:\rustc -Force -ErrorAction SilentlyContinue
 	$env:LOCALAPPDATA = $oldLocalAppData
 	Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }

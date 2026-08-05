@@ -887,11 +887,37 @@ install_binary() {
 # ---------------------------------------------------------------------------
 
 rust_hint() {
-	if [ "$(uname -s)" = Darwin ] && brew_works; then
-		printf 'brew install rust'
+	if command -v rustup >/dev/null 2>&1; then
+		printf 'rustup update stable'
+	elif [ "$(uname -s)" = Darwin ] && brew_works; then
+		if command -v rustc >/dev/null 2>&1; then printf 'brew upgrade rust'; else printf 'brew install rust'; fi
+	elif [ "$(uname -s)" = FreeBSD ] && command -v pkg >/dev/null 2>&1; then
+		if command -v rustc >/dev/null 2>&1; then printf 'pkg upgrade rust'; else printf 'pkg install rust'; fi
 	else
 		printf "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
 	fi
+}
+
+inspect_rust() {
+	RUST_COMPATIBLE=0
+	RUST_VERSION=$(rustc --version 2>/dev/null | awk 'NR == 1 && $1 == "rustc" { print $2 }' || :)
+	if [ -z "$RUST_VERSION" ]; then
+		return 0
+	fi
+	ric_base=${RUST_VERSION%%-*}
+	ric_major=${ric_base%%.*}
+	ric_rest=${ric_base#*.}
+	if [ "$ric_rest" = "$ric_base" ]; then
+		return 0
+	fi
+	ric_minor=${ric_rest%%.*}
+	case $ric_major:$ric_minor in
+	*[!0-9:]* | :* | *:) return 0 ;;
+	esac
+	if [ "$ric_major" -gt 1 ] || { [ "$ric_major" -eq 1 ] && [ "$ric_minor" -ge 94 ]; }; then
+		RUST_COMPATIBLE=1
+	fi
+	return 0
 }
 
 # Reserve an unpredictable, same-filesystem directory for a Git clone. Git can
@@ -909,9 +935,19 @@ make_source_stage() {
 install_source() {
 	step method "source  ${C_DIM}git + cargo${C_RESET}"
 
+	if ! command -v cargo >/dev/null 2>&1 || ! command -v rustc >/dev/null 2>&1; then
+		die "a source build needs Rust 1.94 or newer:
+   $(rust_hint)
+   then re-run this installer"
+	fi
+	RUST_VERSION=""
+	inspect_rust
+	if [ "$RUST_COMPATIBLE" != 1 ]; then
+		die "a source build needs Rust 1.94 or newer (found ${RUST_VERSION:-unknown}):
+	   $(rust_hint)
+	   then re-run this installer"
+	fi
 	command -v git >/dev/null 2>&1 || die "a source build needs git"
-	command -v cargo >/dev/null 2>&1 || die "a source build needs Rust 1.94 or newer:
-   $(rust_hint)"
 	if ! command -v cc >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1 &&
 		! command -v clang >/dev/null 2>&1; then
 		die "a source build needs a C/C++ toolchain (cc, gcc, or clang)"

@@ -522,11 +522,26 @@ function Install-FromRelease {
 function Install-FromSource {
 	Write-Step 'method' "source  $($script:CDim)git + cargo$($script:CReset)"
 
+	if (-not (Get-Command cargo -ErrorAction SilentlyContinue) -or
+		-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
+		Stop-Install "a source build needs Rust 1.94 or newer:`n   winget install --id Rustlang.Rustup`n   then re-run this installer"
+	}
+	$rustOutput = "$(& rustc --version 2>$null)".Trim()
+	if ($LASTEXITCODE -ne 0 -or $rustOutput -notmatch '^rustc\s+(\d+)\.(\d+)') {
+		Stop-Install "cannot determine the installed Rust version; install Rust 1.94 or newer and re-run this installer"
+	}
+	$rustMajor = [int]$Matches[1]
+	$rustMinor = [int]$Matches[2]
+	if ($rustMajor -lt 1 -or ($rustMajor -eq 1 -and $rustMinor -lt 94)) {
+		$rustCommand = if (Get-Command rustup -ErrorAction SilentlyContinue) {
+			'rustup update stable'
+		} else {
+			'winget upgrade --id Rustlang.Rustup'
+		}
+		Stop-Install "a source build needs Rust 1.94 or newer (found $rustOutput):`n   $rustCommand`n   then re-run this installer"
+	}
 	if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 		Stop-Install "a source build needs git:`n   winget install --id Git.Git"
-	}
-	if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-		Stop-Install "a source build needs Rust 1.94 or newer:`n   winget install --id Rustlang.Rustup"
 	}
 	if (-not (Get-Command link.exe -ErrorAction SilentlyContinue) -and
 		-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {

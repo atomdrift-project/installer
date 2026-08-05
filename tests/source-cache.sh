@@ -28,6 +28,7 @@ MOCK_CLONE_FAIL=0
 MOCK_FETCH_FAIL=0
 MOCK_ORIGIN='https://github.com/atomdrift-project/scan.git'
 MOCK_PROMOTE_FAIL=0
+MOCK_RUST_VERSION=1.94.0
 
 git() {
 	case $1 in
@@ -84,6 +85,8 @@ EOF
 	chmod 755 target/release/atomscan
 }
 
+rustc() { printf 'rustc %s (test toolchain)\n' "$MOCK_RUST_VERSION"; }
+
 uname() { printf '%s\n' FreeBSD; }
 installed_version() { return 1; }
 install_binary_file() { INSTALLED=$1; }
@@ -98,6 +101,20 @@ INSTALL_DIR="$fixture_root/bin"
 export HOME XDG_CACHE_HOME
 
 source_dir="$XDG_CACHE_HOME/atomdrift/scan"
+
+# Reject an old compiler before resolving a release or touching the cache.
+MOCK_RUST_VERSION=1.93.9
+old_rust_log="$fixture_root/old-rust.log"
+if (install_source >"$old_rust_log" 2>&1); then
+	fail 'source install accepted Rust older than its MSRV'
+fi
+old_rust_output=$(sed -n '1,20p' "$old_rust_log")
+case $old_rust_output in
+*'Rust 1.94 or newer (found 1.93.9)'*'then re-run this installer'*) : ;;
+*) fail 'old-Rust error did not report the requirement and recovery action' ;;
+esac
+[ ! -e "$source_dir" ] || fail 'old Rust toolchain touched the source cache'
+MOCK_RUST_VERSION=1.94.0
 
 # Even the initial clone is staged, so interruption leaves no poisoned cache.
 MOCK_CLONE_FAIL=1
