@@ -1,0 +1,288 @@
+name: installer
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-shell:
+    name: POSIX shells and release inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The platform test compares our target list with Scan's current release
+      # inventory when this checkout is present. A new Scan target therefore
+      # cannot silently miss installer coverage.
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: atomdrift-project/scan
+          path: .scan-upstream
+          persist-credentials: false
+
+      - name: Install shell test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ksh shellcheck zsh
+
+      - name: Lint
+        run: shellcheck -s sh scan.sh tests/*.sh
+
+      - name: Test target inventory and platform mappings
+        env:
+          SCAN_RELEASE_WORKFLOW: ${{ github.workspace }}/.scan-upstream/.github/workflows/release.yml
+        run: |
+          set -eu
+          sh tests/platforms.sh
+          dash tests/platforms.sh
+          ksh tests/platforms.sh
+          bash --posix tests/platforms.sh
+          zsh --emulate sh tests/platforms.sh
+
+      - name: Test PATH selection and privilege fallbacks
+        run: |
+          set -eu
+          sh tests/install-dir.sh
+          dash tests/install-dir.sh
+          ksh tests/install-dir.sh
+          bash --posix tests/install-dir.sh
+          zsh --emulate sh tests/install-dir.sh
+
+  linux-distros:
+    name: Linux / ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Silverblue is an OSTree host rather than a practical CI container;
+          # its Fedora userspace and privilege-free $HOME install are covered
+          # by the standard Fedora image.
+          - name: Fedora (Silverblue fallback)
+            image: fedora:latest
+            target: x86_64-unknown-linux-gnu
+          - name: Debian
+            image: debian:stable-slim
+            target: x86_64-unknown-linux-gnu
+          - name: Ubuntu
+            image: ubuntu:latest
+            target: x86_64-unknown-linux-gnu
+          - name: SUSE
+            image: opensuse/leap:latest
+            target: x86_64-unknown-linux-gnu
+          - name: Alpine
+            image: alpine:latest
+            target: x86_64-unknown-linux-musl
+          - name: Wolfi
+            image: cgr.dev/chainguard/wolfi-base:latest
+            target: x86_64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Smoke test in ${{ matrix.name }}
+        env:
+          IMAGE: ${{ matrix.image }}
+          EXPECTED_TARGET: ${{ matrix.target }}
+        run: |
+          set -eu
+          docker pull "$IMAGE"
+          docker run --rm \
+            --user 65532:65532 \
+            -v "$PWD:/work:ro" \
+            -w /work \
+            "$IMAGE" /bin/sh -c \
+            "tests/integration.sh '$EXPECTED_TARGET' && tests/native-platform.sh '$EXPECTED_TARGET' && tests/install-dir.sh"
+
+  linux-arm64:
+    name: Linux / Ubuntu arm64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sh tests/integration.sh aarch64-unknown-linux-gnu
+      - run: sh tests/native-platform.sh aarch64-unknown-linux-gnu
+      - run: sh tests/install-dir.sh
+
+  macos:
+    name: macOS / arm64
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sh tests/integration.sh aarch64-apple-darwin
+      - run: sh tests/native-platform.sh aarch64-apple-darwin
+      - run: sh tests/install-dir.sh
+
+  windows:
+    name: Windows / PowerShell 5.1
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Parse installer
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\scan.ps1).Path, [ref]$tokens, [ref]$errors)
+          if ($errors -and $errors.Count) {
+            $errors | Format-List -Force
+            throw "scan.ps1 has $($errors.Count) parser error(s)"
+          }
+
+      - name: Native install smoke test
+        shell: powershell
+        run: .\tests\windows.ps1
+
+  bsd:
+    name: BSD family
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: FreeBSD 15
+        uses: vmactions/freebsd-vm@77ed28d336d03fe19a3f4f7266c1d2c4714dd79d # v1.5.2
+        with:
+          release: "15.0"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-freebsd && sh tests/native-platform.sh x86_64-unknown-freebsd && sh tests/install-dir.sh
+
+      - name: OpenBSD 7.9
+        if: ${{ !cancelled() }}
+        uses: vmactions/openbsd-vm@c941015845c0f0c429676840963dc63b226d4f69 # v1.4.5
+        with:
+          release: "7.9"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-openbsd && sh tests/native-platform.sh x86_64-unknown-openbsd && sh tests/install-dir.sh
+
+      - name: NetBSD 10.1
+        if: ${{ !cancelled() }}
+        uses: vmactions/netbsd-vm@e7ac71b97abbe8437cec8859a5acf72dfa6a8be0 # v1.4.5
+        with:
+          release: "10.1"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-netbsd && sh tests/native-platform.sh x86_64-unknown-netbsd && sh tests/install-dir.sh
+
+      - name: DragonFly BSD 6.4
+        if: ${{ !cancelled() }}
+        uses: vmactions/dragonflybsd-vm@bc8ccbaa091ce3624c93f2dc328ae48129b07580 # v1.3.1
+        with:
+          release: "6.4.2"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-dragonfly && sh tests/native-platform.sh x86_64-unknown-dragonfly && sh tests/install-dir.sh
+
+  niche-unix:
+    name: Haiku, Hurd, Solaris, illumos
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Haiku R1/beta5
+        uses: vmactions/haiku-vm@0ba6b98c8d7e5626f9defdd7403af49ad72b51df # v1.1.3
+        with:
+          release: "r1beta5"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-haiku && sh tests/native-platform.sh x86_64-unknown-haiku && sh tests/install-dir.sh
+
+      - name: GNU/Hurd 2025
+        if: ${{ !cancelled() }}
+        uses: vmactions/hurd-vm@12ce185b5e88948ae6f23f8675d356a35ff665f3 # v1.0.0
+        with:
+          release: "2025"
+          sync: nfs
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-hurd-gnu && sh tests/native-platform.sh x86_64-unknown-hurd-gnu && sh tests/install-dir.sh
+
+      - name: Solaris 11.4
+        if: ${{ !cancelled() }}
+        uses: vmactions/solaris-vm@315163f088b66e55bbcc45928bd224d4973b2312 # v1.3.8
+        with:
+          release: "11.4-gcc"
+          usesh: true
+          run: sh tests/integration.sh x86_64-pc-solaris && sh tests/native-platform.sh x86_64-pc-solaris && sh tests/install-dir.sh
+
+      - name: OmniOS r151058
+        if: ${{ !cancelled() }}
+        uses: vmactions/omnios-vm@027e3ec08fed6fb740ab5f300c2605f9de02997a # v1.3.4
+        with:
+          release: "r151058"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-illumos && sh tests/native-platform.sh x86_64-unknown-illumos && sh tests/install-dir.sh
+
+  compatibility-vms:
+    name: Distribution compatibility VMs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: OpenIndiana 202604
+        uses: vmactions/openindiana-vm@52f16d4534fe3edd9d9621621c238398d4d2a698 # v1.1.5
+        with:
+          release: "202604"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-illumos && sh tests/native-platform.sh x86_64-unknown-illumos && sh tests/install-dir.sh
+
+      - name: Tribblix 0m40
+        if: ${{ !cancelled() }}
+        uses: vmactions/tribblix-vm@4a486df18403c7ceeeab5fcb82fa47ff2116d35a # v1.0.3
+        with:
+          release: "0m40"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-illumos && sh tests/native-platform.sh x86_64-unknown-illumos && sh tests/install-dir.sh
+
+      - name: GhostBSD 26.1
+        if: ${{ !cancelled() }}
+        uses: vmactions/ghostbsd-vm@5ed1dcce064c887d3767fc00ac0176a51fdd4e74 # v1.0.2
+        with:
+          release: "26.1"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-freebsd && sh tests/native-platform.sh x86_64-unknown-freebsd && sh tests/install-dir.sh
+
+      - name: openEuler 25.09
+        if: ${{ !cancelled() }}
+        uses: vmactions/openeuler-vm@694e5d6637c08e6ed139a0403bae8041d5651e20 # v1.0.0
+        with:
+          release: "25.09"
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-linux-gnu && sh tests/native-platform.sh x86_64-unknown-linux-gnu && sh tests/install-dir.sh
+
+      - name: BlissOS 16
+        if: ${{ !cancelled() }}
+        uses: vmactions/blissos-vm@aa5109850186555568e720ca897237440645ef10 # v1.0.1
+        with:
+          release: "16"
+          sync: scp
+          usesh: true
+          run: sh tests/integration.sh x86_64-unknown-linux-musl && sh tests/native-platform.sh x86_64-unknown-linux-musl && sh tests/install-dir.sh
