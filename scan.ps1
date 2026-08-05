@@ -3,11 +3,11 @@
     Install Atomdrift Scan (the `atomscan` CLI) on Windows.
 
 .DESCRIPTION
-    irm https://install.atomdrift.org/ps1 | iex
+    irm https://install.atomdrift.org/scan.ps1 | iex
 
     With options, which `iex` cannot pass through:
 
-    & ([scriptblock]::Create((irm https://install.atomdrift.org/ps1))) -Method Binary
+    & ([scriptblock]::Create((irm https://install.atomdrift.org/scan.ps1))) -Method Binary
 
     It works out the platform, fetches a release binary (checksum- and
     provenance-verified), falls back to a source build when no binary is

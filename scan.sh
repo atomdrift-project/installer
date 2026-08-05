@@ -1,11 +1,11 @@
 #!/bin/sh
 # install.sh — install Atomdrift Scan (the `atomscan` CLI).
 #
-#   curl -fsSL https://install.atomdrift.org | sh
+#   curl -fsSL https://install.atomdrift.org/scan.sh | sh
 #
 # Passing options through a pipe needs `sh -s --`:
 #
-#   curl -fsSL https://install.atomdrift.org | sh -s -- --dir ~/bin --method binary
+#   curl -fsSL https://install.atomdrift.org/scan.sh | sh -s -- --dir ~/bin --method binary
 #
 # What it does, in order: work out the platform, pick an install method, fetch a
 # release binary (checksum- and provenance-verified), fall back to a source
@@ -79,13 +79,13 @@ Install Atomdrift Scan — malware and supply-chain analysis for files,
 directories, archives, packages, URLs, and processes.
 
 Usage: install.sh [options]
-       curl -fsSL https://install.atomdrift.org | sh -s -- [options]
+       curl -fsSL https://install.atomdrift.org/scan.sh | sh -s -- [options]
 
 Options:
   --version VERSION   Install a specific version (default: the latest release).
   --dir DIR           Install into DIR (default: a suitable directory on PATH).
   --method METHOD     auto, binary, brew, or source. auto prefers Homebrew on
-                      macOS, then a release binary, then a source build.
+                      macOS and Linux, then a release binary, then source.
   --no-tools          Skip the optional analysis tool check (rizin, upx, ...).
   --force             Reinstall even when the target version is already there.
   --quiet             Only report problems.
@@ -292,7 +292,7 @@ detect_platform() {
 		;;
 	CYGWIN* | MINGW* | MSYS* | Windows_NT)
 		die "on Windows, use install.ps1 instead:
-   irm https://install.atomdrift.org/ps1 | iex"
+   irm https://install.atomdrift.org/scan.ps1 | iex"
 		;;
 	*)
 		SELF="$dp_arch-unknown-$(printf '%s' "$dp_os" | tr '[:upper:]' '[:lower:]')"
@@ -710,18 +710,41 @@ install_binary_file() {
 # ---------------------------------------------------------------------------
 # Method: Homebrew
 #
-# The native package manager on macOS: it owns upgrades, PATH, and — through the
-# cleave formula — rizin and upx. The formula builds from source, which is slow,
-# so say so and leave `--method binary` one flag away.
+# On macOS and Linux it owns upgrades, PATH, and — through the cleave formula —
+# rizin and upx. The formula builds from source, which is slow, so say so and
+# leave `--method binary` one flag away.
 # ---------------------------------------------------------------------------
 
 brew_works() {
 	command -v brew >/dev/null 2>&1 && brew --version >/dev/null 2>&1
 }
 
+trust_brew_formulae() {
+	# Homebrew 6 requires every non-official formula it evaluates to be trusted.
+	# Installing scan by its fully qualified name trusts scan itself, but not the
+	# cleave formula it depends on. Keep the grant narrow instead of trusting the
+	# whole tap, and support Homebrew versions without the `trust` command.
+	if brew help trust >/dev/null 2>&1; then
+		brew trust --formula "$TAP/scan" "$TAP/cleave" || return 1
+	fi
+}
+
+auto_method() {
+	case "$(uname -s 2>/dev/null || :)" in
+	Darwin | Linux)
+		if brew_works && [ -z "$OPT_DIR" ] && [ -z "$OPT_VERSION" ]; then
+			printf '%s\n' brew
+			return 0
+		fi
+		;;
+	esac
+	printf '%s\n' binary
+}
+
 install_brew() {
 	step method "Homebrew  ${C_DIM}$TAP/scan${C_RESET}"
 
+	trust_brew_formulae || return 1
 	br_prefix=$(brew --prefix 2>/dev/null) || return 1
 	if brew list --formula "$TAP/scan" >/dev/null 2>&1; then
 		if [ "$OPT_FORCE" = 1 ]; then
@@ -1055,19 +1078,14 @@ main() {
 
 	BREW_PREFIX=$(brew --prefix 2>/dev/null || :)
 
-	# Homebrew is the right owner of a macOS install when it is there: it holds
-	# upgrades, PATH, and the rizin and upx dependencies. It cannot honour a
-	# chosen directory or version, though, so asking for either says plainly
-	# that this is not a Homebrew install.
+	# Homebrew is the right owner of a macOS or Linux install when it is there:
+	# it holds upgrades, PATH, and the rizin and upx dependencies. It cannot
+	# honour a chosen directory or version, so either option bypasses Homebrew.
 	METHOD=$OPT_METHOD
 	main_auto=0
 	if [ "$METHOD" = auto ]; then
 		main_auto=1
-		if [ "$(uname -s)" = Darwin ] && brew_works && [ -z "$OPT_DIR" ] && [ -z "$OPT_VERSION" ]; then
-			METHOD=brew
-		else
-			METHOD=binary
-		fi
+		METHOD=$(auto_method)
 	fi
 	if [ "$METHOD" = brew ]; then
 		if ! brew_works; then

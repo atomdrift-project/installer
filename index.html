@@ -204,17 +204,6 @@
     .installer-card h3 { font-size: 21px; letter-spacing: -.3px; }
     .card-description { color: var(--graphite); font-size: 14px; margin-top: 5px; }
 
-    .installer-card[data-installer="homebrew"] {
-      display: grid;
-      grid-column: 1 / -1;
-      grid-template-columns: minmax(0, 1fr) 210px;
-    }
-
-    .installer-card[data-installer="homebrew"] .support {
-      border-left: 1px solid var(--border);
-      border-top: 0;
-    }
-
     .terminal { background: var(--carbon); border-radius: 9px; color: #f4f4f5; margin-top: 17px; overflow: hidden; }
     .terminal-bar { align-items: center; border-bottom: 1px solid #292929; display: flex; gap: 6px; padding: 9px 11px; }
     .terminal-dot { border-radius: 50%; height: 7px; width: 7px; }
@@ -287,8 +276,6 @@
       .hero::after { font-size: 150px; opacity: .32; }
       h1 { letter-spacing: -1px; }
       .installer-grid, .alternatives { grid-template-columns: 1fr; }
-      .installer-card[data-installer="homebrew"] { display: flex; grid-column: auto; }
-      .installer-card[data-installer="homebrew"] .support { border-left: 0; border-top: 1px solid var(--border); }
       .behavior-grid { grid-template-columns: repeat(2, 1fr); }
       .section-head { align-items: start; flex-direction: column; gap: 2px; }
     }
@@ -359,39 +346,20 @@
     <section id="installers" aria-labelledby="installers-title">
       <div class="section-head">
         <h2 id="installers-title">Installation methods</h2>
-        <p>Select by operating system and package-management preference.</p>
+        <p>Select the installer for your operating system.</p>
       </div>
 
       <div class="installer-grid">
-        <article class="installer-card" data-installer="homebrew">
-          <div class="card-main">
-            <div class="card-kicker"><span class="method-kind">Package manager</span><span class="badge">Homebrew</span></div>
-            <h3>Homebrew</h3>
-            <p class="card-description">Installs from the Atomdrift tap; Homebrew adds the tap automatically and controls the prefix, dependencies, upgrades, and removal.</p>
-            <div class="terminal">
-              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
-              <div class="command-row">
-                <code>brew install atomdrift-project/tap/scan</code>
-                <button class="copy-button" type="button" data-copy="brew install atomdrift-project/tap/scan" aria-label="Copy Homebrew install command">copy</button>
-              </div>
-            </div>
-          </div>
-          <div class="support">
-            <p class="support-title">Supported operating systems</p>
-            <ul class="os-list"><li>macOS</li><li>Linux</li></ul>
-          </div>
-        </article>
-
         <article class="installer-card" data-installer="unix">
           <div class="card-main">
             <div class="card-kicker"><span class="method-kind">Installer</span><span class="badge">POSIX sh</span></div>
             <h3>Shell installer</h3>
-            <p class="card-description">Detects the kernel, CPU architecture, and Linux libc. Uses a release binary when published and otherwise builds from source.</p>
+            <p class="card-description">Detects the kernel, CPU architecture, and Linux libc. On macOS and Linux it delegates to Homebrew when available; otherwise it uses a release binary or builds from source.</p>
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
               <div class="command-row">
-                <code>curl -fsSL https://install.atomdrift.org | sh</code>
-                <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org | sh" aria-label="Copy POSIX shell install command">copy</button>
+                <code>curl -fsSL https://install.atomdrift.org/scan.sh | sh</code>
+                <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/scan.sh | sh" aria-label="Copy POSIX shell install command">copy</button>
               </div>
             </div>
           </div>
@@ -413,8 +381,8 @@
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">powershell</span></div>
               <div class="command-row">
-                <code>irm https://install.atomdrift.org/ps1 | iex</code>
-                <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/ps1 | iex" aria-label="Copy PowerShell install command">copy</button>
+                <code>irm https://install.atomdrift.org/scan.ps1 | iex</code>
+                <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/scan.ps1 | iex" aria-label="Copy PowerShell install command">copy</button>
               </div>
             </div>
           </div>
