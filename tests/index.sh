@@ -20,24 +20,20 @@ assert_page_contains() {
 
 assert_page_contains 'curl -fsSL https://install.atomdrift.org/scan.sh | sh'
 assert_page_contains 'irm https://install.atomdrift.org/scan.ps1 | iex'
-assert_page_contains 'On macOS and Linux it delegates to Homebrew when available'
+assert_page_contains 'Uses Homebrew when available'
 assert_page_contains 'https://github.com/atomdrift-project/scan/releases/latest'
 assert_page_contains 'SHA256SUMS'
-assert_page_contains 'Pre-install check'
-assert_page_contains 'doas'
-assert_page_contains 'pfexec'
-assert_page_contains 'sudo'
+assert_page_contains 'before replacing anything'
+assert_page_contains 'class="terminal terminal-windows"'
+assert_page_contains 'class="window-controls"'
+assert_page_contains 'Windows PowerShell'
 
 if grep -F 'atomdrift/tap' "$PAGE" >/dev/null; then
 	fail 'installer page still uses the legacy tap namespace'
 fi
 
-for platform in macOS Linux FreeBSD OpenBSD NetBSD 'DragonFly BSD' Solaris illumos Android Windows; do
+for platform in macOS Linux BSD Solaris illumos Android Windows; do
 	assert_page_contains "$platform"
-done
-
-for distro in Fedora Debian Ubuntu openSUSE Alpine Wolfi openEuler; do
-	assert_page_contains "$distro"
 done
 
 for unsupported in Haiku GhostBSD BlissOS GNU/Hurd; do
@@ -46,4 +42,4 @@ for unsupported in Haiku GhostBSD BlissOS GNU/Hurd; do
 	fi
 done
 
-printf 'ok - installer methods, supported platforms, and security behavior\n'
+printf 'ok - concise installer page, supported platforms, and security behavior\n'

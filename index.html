@@ -23,17 +23,15 @@
       --cream: #fafaf9;
       --border: #e8e8e8;
       --blue: #3b82f6;
-      --blue-dim: rgba(59, 130, 246, 0.1);
       --toxic: #d0ff00;
       --toxic-muted: #9abe25;
       --toxic-dark: #4a6b0f;
-      --toxic-dim: rgba(208, 255, 0, 0.14);
       --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       --display: Oxanium, "Arial Narrow", sans-serif;
       --body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    html { color-scheme: light; scroll-behavior: smooth; }
+    html { color-scheme: light; }
 
     body {
       background: var(--white);
@@ -59,8 +57,8 @@
       padding: 14px 0;
     }
 
-    .header-inner, .nav-inner, main, .footer-inner {
-      max-width: 1000px;
+    .header-inner, main, .footer-inner {
+      max-width: 960px;
       margin-inline: auto;
       width: calc(100% - 40px);
     }
@@ -81,8 +79,6 @@
     }
 
     .atom-logo { width: 38px; height: 38px; flex: 0 0 auto; }
-    .brand-copy { display: flex; flex-direction: column; }
-
     .brand-name {
       font-family: var(--display);
       font-size: 24px;
@@ -92,8 +88,6 @@
     }
 
     .brand-name span { color: var(--toxic-muted); }
-    .brand-tagline { color: var(--iron); font-size: 14px; margin-top: 3px; }
-
     .header-links { display: flex; gap: 8px; }
 
     .header-links a {
@@ -108,78 +102,36 @@
     .header-links a:last-child { background: var(--carbon); border-color: var(--carbon); color: var(--white); }
     .header-links a:hover { border-color: var(--blue); }
 
-    .toxic-stripe { height: 4px; background: linear-gradient(90deg, var(--toxic), var(--toxic-muted) 52%, transparent); }
+    .toxic-stripe { height: 3px; background: linear-gradient(90deg, var(--toxic), var(--toxic-muted) 48%, transparent); }
 
-    .nav { background: var(--mist); border-bottom: 1px solid var(--border); }
-    .nav-inner { display: flex; }
-    .nav a { border-inline: 1px solid var(--border); color: var(--graphite); font-size: 14px; padding: 9px 17px; text-decoration: none; }
-    .nav a + a { border-left: 0; }
-    .nav a.active { background: var(--cream); border-bottom: 2px solid var(--blue); margin-bottom: -1px; font-weight: 600; }
-
-    main { padding-block: 42px 20px; }
+    main { padding-block: 54px 24px; }
 
     .hero {
-      position: relative;
-      overflow: hidden;
-      background: var(--cream);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 42px clamp(24px, 6vw, 58px);
-      margin-bottom: 26px;
-    }
-
-    .hero::after {
-      content: "⚛";
-      position: absolute;
-      right: -14px;
-      top: -55px;
-      color: var(--toxic);
-      font-size: 220px;
-      line-height: 1;
-      opacity: .55;
-      transform: rotate(-12deg);
-      pointer-events: none;
-    }
-
-    .eyebrow {
-      color: var(--toxic-dark);
-      font-family: var(--mono);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .1em;
-      margin-bottom: 12px;
-      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 34px;
+      padding-bottom: 42px;
     }
 
     h1, h2, h3 { font-family: var(--display); }
 
     h1 {
-      font-size: clamp(34px, 6vw, 58px);
+      font-size: clamp(36px, 6vw, 54px);
       letter-spacing: -2px;
       line-height: 1.02;
-      max-width: 700px;
-      position: relative;
-      z-index: 1;
     }
 
     .hero-copy {
       color: var(--graphite);
       font-size: 18px;
-      margin-top: 18px;
-      max-width: 620px;
-      position: relative;
-      z-index: 1;
+      margin-top: 12px;
+      max-width: 560px;
     }
 
-    .promise-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; position: relative; z-index: 1; }
-    .promise { background: var(--white); border: 1px solid var(--border); border-radius: 999px; color: var(--iron); font-size: 13px; padding: 5px 10px; }
-    .promise::first-letter { color: var(--toxic-dark); }
-
-    .section-head { align-items: end; display: flex; justify-content: space-between; gap: 20px; margin: 34px 0 15px; }
+    .section-head { margin: 38px 0 14px; }
+    .hero + section .section-head { margin-top: 0; }
     .section-head h2 { font-size: 22px; letter-spacing: -.4px; }
-    .section-head p { color: var(--slate); font-size: 14px; }
 
-    .installer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; min-width: 0; }
+    .installer-grid { align-items: stretch; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; min-width: 0; }
 
     .installer-card {
       background: var(--white);
@@ -189,23 +141,20 @@
       flex-direction: column;
       min-width: 0;
       overflow: hidden;
-      transition: box-shadow .2s, transform .2s;
+      transition: box-shadow .2s;
     }
 
     .installer-card:hover {
-      box-shadow: -4px 0 0 var(--toxic), 0 10px 28px rgba(10, 10, 10, .06);
-      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(10, 10, 10, .07);
     }
 
-    .card-main { flex: 1; padding: 22px; }
-    .card-kicker { align-items: center; display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-    .method-kind { color: var(--slate); font: 700 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
-    .badge { background: var(--toxic-dim); border: 1px solid rgba(154, 190, 37, .28); border-radius: 5px; color: var(--toxic-dark); font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 7px; text-transform: uppercase; }
-    .installer-card h3 { font-size: 21px; letter-spacing: -.3px; }
+    .card-main { display: flex; flex: 0 0 255px; flex-direction: column; min-width: 0; padding: 24px; }
+    .badge { color: var(--toxic-dark); font: 700 11px var(--mono); letter-spacing: .08em; margin-bottom: 7px; text-transform: uppercase; }
+    .installer-card h3 { font-size: 22px; letter-spacing: -.3px; }
     .card-description { color: var(--graphite); font-size: 14px; margin-top: 5px; }
 
-    .terminal { background: var(--carbon); border-radius: 9px; color: #f4f4f5; margin-top: 17px; overflow: hidden; }
-    .terminal-bar { align-items: center; border-bottom: 1px solid #292929; display: flex; gap: 6px; padding: 9px 11px; }
+    .terminal { background: var(--carbon); border-radius: 9px; color: #f4f4f5; margin-top: auto; min-width: 0; overflow: hidden; }
+    .terminal-bar { align-items: center; border-bottom: 1px solid #292929; display: flex; gap: 6px; height: 34px; padding: 0 11px; }
     .terminal-dot { border-radius: 50%; height: 7px; width: 7px; }
     .terminal-dot:nth-child(1) { background: #ff4646; }
     .terminal-dot:nth-child(2) { background: #ffaf37; }
@@ -214,6 +163,16 @@
     .command-row { align-items: center; display: flex; gap: 10px; min-width: 0; padding: 14px; }
     .command-row code { color: #fff; flex: 1; font: 12.5px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
     .command-row code::before { color: var(--toxic); content: "$ "; }
+
+    .terminal-windows { border: 1px solid #d6d6d6; border-radius: 7px; }
+    .terminal-windows .terminal-bar { background: #f3f3f3; border-bottom-color: #d6d6d6; gap: 8px; height: 34px; padding: 0 0 0 10px; }
+    .terminal-windows .terminal-app { align-items: center; background: #0b67b2; color: #fff; display: flex; font: 700 9px Consolas, monospace; height: 18px; justify-content: center; width: 18px; }
+    .terminal-windows .terminal-label { color: #252525; font: 12px "Segoe UI", sans-serif; margin: 0; text-transform: none; }
+    .window-controls { align-self: stretch; display: flex; margin-left: auto; }
+    .window-control { align-items: center; color: #333; display: flex; font: 12px "Segoe UI Symbol", sans-serif; justify-content: center; width: 34px; }
+    .window-control:last-child { font-size: 14px; }
+    .terminal-windows .command-row code { font-family: Consolas, "Liberation Mono", monospace; }
+    .terminal-windows .command-row code::before { color: #60a5fa; content: "PS> "; }
 
     .copy-button {
       background: #222;
@@ -229,20 +188,15 @@
     .copy-button:hover { border-color: var(--toxic-muted); color: var(--toxic); }
     .copy-button.copied { background: var(--toxic); border-color: var(--toxic); color: var(--carbon); }
 
-    .support { background: var(--cream); border-top: 1px solid var(--border); padding: 16px 22px 19px; }
+    .support { background: var(--cream); border-top: 1px solid var(--border); flex: 1; padding: 17px 24px 20px; }
     .support-title { color: var(--iron); font: 700 10px var(--mono); letter-spacing: .08em; margin-bottom: 9px; text-transform: uppercase; }
-    .support-title:not(:first-child) { margin-top: 14px; }
-    .os-list { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; }
-    .os-list li { background: var(--white); border: 1px solid var(--border); border-radius: 5px; color: var(--graphite); font-size: 12px; padding: 3px 7px; }
-    .requirements { color: var(--graphite); font: 12px/1.55 var(--mono); }
+    .support-copy { color: var(--graphite); font-size: 13px; }
+    .requirements { color: var(--slate); font: 12px/1.55 var(--mono); margin-top: 8px; }
 
-    .alternatives { display: grid; grid-template-columns: 1fr; gap: 18px; }
-    .alternative { border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-    .alternative h3 { align-items: center; display: flex; font-size: 17px; gap: 8px; }
-    .alternative p { color: var(--iron); font-size: 14px; margin: 7px 0 12px; }
-    .mini-command { background: var(--mist); border-radius: 7px; display: flex; gap: 10px; padding: 11px 12px; }
-    .mini-command code { flex: 1; font: 12px/1.5 var(--mono); overflow-x: auto; white-space: pre; }
-    .text-link { font-size: 14px; font-weight: 600; }
+    .alternative { align-items: center; border: 1px solid var(--border); border-radius: 12px; display: flex; gap: 24px; justify-content: space-between; padding: 20px 22px; }
+    .alternative h3 { font-size: 17px; }
+    .alternative p { color: var(--iron); font-size: 14px; margin-top: 4px; max-width: 680px; }
+    .text-link { font-size: 14px; font-weight: 600; white-space: nowrap; }
 
     .behavior-grid {
       border: 1px solid var(--border);
@@ -257,44 +211,30 @@
     .behavior-item dt { color: var(--carbon); font: 700 11px var(--mono); letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
     .behavior-item dd { color: var(--graphite); font-size: 13px; line-height: 1.55; }
 
-    .manual-steps { color: var(--graphite); font-size: 13px; margin: 10px 0 13px 19px; }
-    .manual-steps li { margin-bottom: 3px; padding-left: 3px; }
-
     .fine-print { color: var(--slate); font-size: 13px; margin-top: 13px; }
-    .fine-print code { background: var(--mist); border-radius: 3px; font-family: var(--mono); padding: 1px 4px; }
-
     .site-footer { background: var(--carbon); color: var(--slate); font-size: 13px; margin-top: 42px; padding: 20px 0; position: relative; }
     .site-footer::before { background: var(--toxic); content: ""; height: 3px; left: 0; position: absolute; top: 0; width: 90px; }
     .footer-inner { display: flex; justify-content: space-between; gap: 20px; }
-    .footer-inner a { color: #a1a1aa; }
-
     @media (max-width: 760px) {
-      .brand-tagline { display: none; }
       .header-links a:first-child { display: none; }
       main { padding-top: 24px; }
-      .hero { padding: 30px 24px; }
-      .hero::after { font-size: 150px; opacity: .32; }
+      .hero { padding-bottom: 28px; }
       h1 { letter-spacing: -1px; }
-      .installer-grid, .alternatives { grid-template-columns: 1fr; }
-      .behavior-grid { grid-template-columns: repeat(2, 1fr); }
-      .section-head { align-items: start; flex-direction: column; gap: 2px; }
+      .installer-grid { grid-template-columns: minmax(0, 1fr); }
+      .card-main { flex-basis: auto; min-height: 245px; }
+      .behavior-grid { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 440px) {
-      .header-inner, .nav-inner, main, .footer-inner { width: calc(100% - 26px); }
+      .header-inner, main, .footer-inner { width: calc(100% - 26px); }
       .header-links a { padding: 6px 9px; }
-      .nav a { padding-inline: 12px; }
-      .behavior-grid { grid-template-columns: 1fr; }
       .command-row { align-items: stretch; flex-direction: column; }
       .command-row code { display: block; width: 100%; }
       .copy-button { align-self: end; }
+      .alternative { align-items: start; flex-direction: column; gap: 10px; }
       .footer-inner { flex-direction: column; gap: 4px; }
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      *, *::before, *::after { transition-duration: .01ms !important; }
-    }
   </style>
 </head>
 <body>
@@ -310,51 +250,33 @@
           <circle cx="82" cy="28" r="3.5" fill="#d0ff00"/>
           <circle cx="50" cy="88" r="3.5" fill="#d0ff00"/>
         </svg>
-        <span class="brand-copy">
-          <span class="brand-name">atom<span>drift</span></span>
-          <span class="brand-tagline">Open-source, local-first supply-chain attack detection</span>
-        </span>
+        <span class="brand-name">atom<span>drift</span></span>
       </a>
       <nav class="header-links" aria-label="External links">
-        <a href="https://atomdrift.org/scan/">About Scan</a>
-        <a href="https://github.com/atomdrift-project/installer">GitHub</a>
+        <a href="https://atomdrift.org/scan/">Scan</a>
+        <a href="https://github.com/atomdrift-project/installer">Source</a>
       </nav>
     </div>
   </header>
   <div class="toxic-stripe"></div>
-  <nav class="nav" aria-label="Installer navigation">
-    <div class="nav-inner">
-      <a class="active" href="#installers">Install</a>
-      <a href="#downloads">Downloads</a>
-      <a href="#behavior">Behavior</a>
-    </div>
-  </nav>
 
   <main>
     <section class="hero">
-      <p class="eyebrow">atomscan / installation</p>
       <h1>Install Atomdrift Scan</h1>
-      <p class="hero-copy">Platform-aware installation methods for Atomdrift Scan. Review the installer source, select a supported method, or download a release artifact manually.</p>
-      <div class="promise-row" aria-label="Installer features">
-        <span class="promise">SHA-256 required</span>
-        <span class="promise">PATH-aware destination</span>
-        <span class="promise">pre-install execution check</span>
-        <span class="promise">atomic replacement</span>
-      </div>
+      <p class="hero-copy">Choose your platform. The installer detects the rest.</p>
     </section>
 
     <section id="installers" aria-labelledby="installers-title">
       <div class="section-head">
-        <h2 id="installers-title">Installation methods</h2>
-        <p>Select the installer for your operating system.</p>
+        <h2 id="installers-title">Choose your platform</h2>
       </div>
 
       <div class="installer-grid">
         <article class="installer-card" data-installer="unix">
           <div class="card-main">
-            <div class="card-kicker"><span class="method-kind">Installer</span><span class="badge">POSIX sh</span></div>
-            <h3>Shell installer</h3>
-            <p class="card-description">Detects the kernel, CPU architecture, and Linux libc. On macOS and Linux it delegates to Homebrew when available; otherwise it uses a release binary or builds from source.</p>
+            <span class="badge">POSIX sh</span>
+            <h3>macOS, Linux &amp; Unix</h3>
+            <p class="card-description">Uses Homebrew when available, then falls back to a verified release binary or source build.</p>
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
               <div class="command-row">
@@ -364,22 +286,23 @@
             </div>
           </div>
           <div class="support">
-            <p class="support-title">Supported operating systems</p>
-            <ul class="os-list">
-              <li>macOS</li><li>Linux (glibc)</li><li>Linux (musl)</li><li>Fedora</li><li>Debian</li><li>Ubuntu</li><li>openSUSE</li><li>Alpine</li><li>Wolfi</li><li>openEuler</li><li>FreeBSD</li><li>OpenBSD</li><li>NetBSD</li><li>DragonFly BSD</li><li>Solaris</li><li>illumos</li><li>Android</li>
-            </ul>
-            <p class="support-title">Requirements and targets</p>
-            <p class="requirements">POSIX sh · curl, wget, fetch, or ftp · gzip · tar. BSD, Solaris, and illumos release binaries are x86-64. macOS and Linux also publish ARM64 binaries; Android uses the Linux musl artifact.</p>
+            <p class="support-title">Runs on</p>
+            <p class="support-copy">macOS · Linux · BSD · Solaris / illumos · Android</p>
+            <p class="requirements">POSIX sh · x86-64 and ARM64 where published</p>
           </div>
         </article>
 
         <article class="installer-card" data-installer="windows">
           <div class="card-main">
-            <div class="card-kicker"><span class="method-kind">Installer</span><span class="badge">PowerShell</span></div>
-            <h3>PowerShell installer</h3>
-            <p class="card-description">Installs into the current user profile and adds the destination to the user PATH.</p>
-            <div class="terminal">
-              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">powershell</span></div>
+            <span class="badge">PowerShell</span>
+            <h3>Windows</h3>
+            <p class="card-description">Installs for the current user and adds <code>atomscan</code> to PATH.</p>
+            <div class="terminal terminal-windows">
+              <div class="terminal-bar" aria-hidden="true">
+                <span class="terminal-app">&gt;_</span>
+                <span class="terminal-label">Windows PowerShell</span>
+                <span class="window-controls"><span class="window-control">—</span><span class="window-control">□</span><span class="window-control">×</span></span>
+              </div>
               <div class="command-row">
                 <code>irm https://install.atomdrift.org/scan.ps1 | iex</code>
                 <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/scan.ps1 | iex" aria-label="Copy PowerShell install command">copy</button>
@@ -387,12 +310,9 @@
             </div>
           </div>
           <div class="support">
-            <p class="support-title">Supported operating systems</p>
-            <ul class="os-list">
-              <li>Windows 10</li><li>Windows 11</li><li>Windows Server 2022</li>
-            </ul>
-            <p class="support-title">Requirements</p>
-            <p class="requirements">x86-64 · Windows PowerShell 5.1 or PowerShell 7 · Windows 10 build 17063+ for binary installation</p>
+            <p class="support-title">Runs on</p>
+            <p class="support-copy">Windows 10 · Windows 11 · Windows Server 2022</p>
+            <p class="requirements">PowerShell 5.1+ · x86-64</p>
           </div>
         </article>
 
@@ -401,38 +321,27 @@
 
     <section id="downloads" aria-labelledby="downloads-title">
       <div class="section-head">
-        <h2 id="downloads-title">Manual installation</h2>
-        <p>Install a specific release without executing an installer script.</p>
+        <h2 id="downloads-title">Manual download</h2>
       </div>
-      <div class="alternatives">
-        <article class="alternative">
+      <article class="alternative">
+        <div>
           <h3>GitHub release artifacts</h3>
-          <p>Release archives are named by Rust target triple and contain the platform executable.</p>
-          <ol class="manual-steps">
-            <li>Download the archive for the required operating system and architecture.</li>
-            <li>Verify the archive against the release’s <code>SHA256SUMS</code>.</li>
-            <li>Extract <code>atomscan</code> or <code>atomscan.exe</code> into a directory on PATH.</li>
-            <li>Run <code>atomscan --version</code> before use.</li>
-          </ol>
-          <a class="text-link" href="https://github.com/atomdrift-project/scan/releases/latest">Open the latest Scan release →</a>
-        </article>
-      </div>
+          <p>Download your target, verify <code>SHA256SUMS</code>, then place <code>atomscan</code> on PATH.</p>
+        </div>
+        <a class="text-link" href="https://github.com/atomdrift-project/scan/releases/latest">View releases →</a>
+      </article>
     </section>
 
     <section id="behavior" aria-labelledby="behavior-title">
       <div class="section-head">
-        <h2 id="behavior-title">Installer behavior</h2>
-        <p>Relevant details for review and deployment.</p>
+        <h2 id="behavior-title">What the installer does</h2>
       </div>
       <dl class="behavior-grid">
-        <div class="behavior-item"><dt>Artifact selection</dt><dd>Maps the operating system, CPU architecture, and Linux libc to a published Rust target triple. A version can be pinned explicitly.</dd></div>
-        <div class="behavior-item"><dt>Integrity</dt><dd>Requires a matching SHA-256 entry from the release’s <code>SHA256SUMS</code>. GitHub attestations are verified when <code>gh</code> is available.</dd></div>
-        <div class="behavior-item"><dt>Pre-install check</dt><dd>Executes the downloaded binary with <code>--version</code> before replacing an existing installation.</dd></div>
-        <div class="behavior-item"><dt>Destination</dt><dd>Prefers a writable user directory already on PATH, then an OS-appropriate system PATH directory.</dd></div>
-        <div class="behavior-item"><dt>Privilege</dt><dd>The shell installer escalates only when required, trying <code>doas</code>, <code>pfexec</code>, then <code>sudo</code>. PowerShell installs per-user.</dd></div>
-        <div class="behavior-item"><dt>Replacement and fallback</dt><dd>Replaces the executable atomically. Automatic mode builds from source when no matching binary is published.</dd></div>
+        <div class="behavior-item"><dt>Detects</dt><dd>Matches the operating system, CPU, and Linux libc to the right install method and release.</dd></div>
+        <div class="behavior-item"><dt>Verifies</dt><dd>Checks SHA-256 and available provenance, then runs <code>--version</code> before replacing anything.</dd></div>
+        <div class="behavior-item"><dt>Installs safely</dt><dd>Uses a directory on PATH and replaces atomically. Privilege is requested only when needed.</dd></div>
       </dl>
-      <p class="fine-print">Release binaries cover x86-64, Apple Silicon, Linux ARM64, s390x, RISC-V 64, and Linux PowerPC 64 LE where published. Review the <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">shell installer</a> or <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">PowerShell installer</a> before execution.</p>
+      <p class="fine-print">Review the <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">shell installer</a> or <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">PowerShell installer</a>.</p>
     </section>
   </main>
 
