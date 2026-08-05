@@ -904,6 +904,29 @@ install_source() {
 		step source "updating $is_src"
 		git -C "$is_src" fetch --quiet --depth 1 origin "$is_ref" || die "cannot fetch $is_ref"
 		git -C "$is_src" checkout --quiet --force FETCH_HEAD || die "cannot check out $is_ref"
+	elif [ -e "$is_src" ] || [ -L "$is_src" ]; then
+		# A killed clone (or an older installer) can leave a non-Git directory
+		# here. Clone beside it first so a network failure leaves that directory
+		# untouched, then swap the completed checkout into place.
+		is_stage="${is_src}.clone.$$"
+		is_old="${is_src}.old.$$"
+		step source "repairing incomplete checkout at $is_src"
+		rm -rf "$is_stage" "$is_old"
+		git clone --quiet --depth 1 --branch "$is_ref" "https://github.com/$REPO.git" "$is_stage" || {
+			rm -rf "$is_stage"
+			die "cannot clone $REPO at $is_ref"
+		}
+		mv "$is_src" "$is_old" || {
+			rm -rf "$is_stage"
+			die "cannot replace incomplete checkout at $is_src"
+		}
+		if mv "$is_stage" "$is_src"; then
+			rm -rf "$is_old"
+		else
+			mv "$is_old" "$is_src" 2>/dev/null || :
+			rm -rf "$is_stage"
+			die "cannot replace incomplete checkout at $is_src"
+		fi
 	else
 		step source "cloning $is_ref into $is_src"
 		git clone --quiet --depth 1 --branch "$is_ref" "https://github.com/$REPO.git" "$is_src" ||

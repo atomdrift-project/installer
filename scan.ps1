@@ -558,6 +558,31 @@ function Install-FromSource {
 		if ($LASTEXITCODE -ne 0) { Stop-Install "cannot fetch $ref" }
 		& git -C $src checkout --quiet --force FETCH_HEAD
 		if ($LASTEXITCODE -ne 0) { Stop-Install "cannot check out $ref" }
+	} elseif (Test-Path -LiteralPath $src) {
+		# Clone beside an incomplete cache first. If cloning fails, the existing
+		# directory remains untouched; after success, replace it transactionally.
+		$suffix = [guid]::NewGuid().ToString('N')
+		$stage = "$src.clone.$suffix"
+		$old = "$src.old.$suffix"
+		Write-Step 'source' "repairing incomplete checkout at $src"
+		& git clone --quiet --depth 1 --branch $ref "https://github.com/$Repo.git" $stage
+		if ($LASTEXITCODE -ne 0) {
+			Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+			Stop-Install "cannot clone $Repo at $ref"
+		}
+		try {
+			Move-Item -LiteralPath $src -Destination $old -ErrorAction Stop
+			try {
+				Move-Item -LiteralPath $stage -Destination $src -ErrorAction Stop
+				Remove-Item -LiteralPath $old -Recurse -Force -ErrorAction SilentlyContinue
+			} catch {
+				Move-Item -LiteralPath $old -Destination $src -ErrorAction SilentlyContinue
+				throw
+			}
+		} catch {
+			Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+			Stop-Install "cannot replace incomplete checkout at $src"
+		}
 	} else {
 		Write-Step 'source' "cloning $ref into $src"
 		New-Item -ItemType Directory -Force -Path (Split-Path -Parent $src) | Out-Null

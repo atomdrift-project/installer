@@ -71,6 +71,15 @@ jobs:
           bash --posix tests/brew.sh
           zsh --emulate sh tests/brew.sh
 
+      - name: Test source cache repair
+        run: |
+          set -eu
+          sh tests/source-cache.sh
+          dash tests/source-cache.sh
+          ksh tests/source-cache.sh
+          bash --posix tests/source-cache.sh
+          zsh --emulate sh tests/source-cache.sh
+
   linux-distros:
     name: Linux / ${{ matrix.name }}
     runs-on: ubuntu-24.04
