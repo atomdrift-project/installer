@@ -57,8 +57,14 @@
       padding: 14px 0;
     }
 
-    .header-inner, main, .footer-inner {
-      max-width: 960px;
+    .header-inner, .footer-inner {
+      max-width: 1200px;
+      margin-inline: auto;
+      width: calc(100% - 40px);
+    }
+
+    main {
+      max-width: 1200px;
       margin-inline: auto;
       width: calc(100% - 40px);
     }
@@ -149,7 +155,6 @@
     }
 
     .card-main { display: flex; flex: 0 0 255px; flex-direction: column; min-width: 0; padding: 24px; }
-    .badge { color: var(--toxic-dark); font: 700 11px var(--mono); letter-spacing: .08em; margin-bottom: 7px; text-transform: uppercase; }
     .installer-card h3 { font-size: 22px; letter-spacing: -.3px; }
     .card-description { color: var(--graphite); font-size: 14px; margin-top: 5px; }
 
@@ -191,8 +196,6 @@
     .support { background: var(--cream); border-top: 1px solid var(--border); flex: 1; padding: 17px 24px 20px; }
     .support-title { color: var(--iron); font: 700 10px var(--mono); letter-spacing: .08em; margin-bottom: 9px; text-transform: uppercase; }
     .support-copy { color: var(--graphite); font-size: 13px; }
-    .requirements { color: var(--slate); font: 12px/1.55 var(--mono); margin-top: 8px; }
-
     .alternative { align-items: center; border: 1px solid var(--border); border-radius: 12px; display: flex; gap: 24px; justify-content: space-between; padding: 20px 22px; }
     .alternative h3 { font-size: 17px; }
     .alternative p { color: var(--iron); font-size: 14px; margin-top: 4px; max-width: 680px; }
@@ -225,12 +228,16 @@
       .behavior-grid { grid-template-columns: 1fr; }
     }
 
+    @media (max-width: 560px) {
+      .command-row { align-items: stretch; flex-direction: column; }
+      .command-row code { display: block; font-size: 11px; overflow: visible; white-space: normal; width: 100%; }
+      .command-target { display: block; }
+      .copy-button { align-self: end; }
+    }
+
     @media (max-width: 440px) {
       .header-inner, main, .footer-inner { width: calc(100% - 26px); }
       .header-links a { padding: 6px 9px; }
-      .command-row { align-items: stretch; flex-direction: column; }
-      .command-row code { display: block; width: 100%; }
-      .copy-button { align-self: end; }
       .alternative { align-items: start; flex-direction: column; gap: 10px; }
       .footer-inner { flex-direction: column; gap: 4px; }
     }
@@ -274,13 +281,12 @@
       <div class="installer-grid">
         <article class="installer-card" data-installer="unix">
           <div class="card-main">
-            <span class="badge">POSIX sh</span>
             <h3>macOS, Linux &amp; Unix</h3>
             <p class="card-description">Uses Homebrew when available, then falls back to a verified release binary or source build.</p>
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
               <div class="command-row">
-                <code>curl -fsSL https://install.atomdrift.org/scan.sh | sh</code>
+                <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/scan.sh | sh</span></code>
                 <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/scan.sh | sh" aria-label="Copy POSIX shell install command">copy</button>
               </div>
             </div>
@@ -288,23 +294,21 @@
           <div class="support">
             <p class="support-title">Runs on</p>
             <p class="support-copy">macOS · Linux · BSD · Solaris / illumos · Android</p>
-            <p class="requirements">POSIX sh · x86-64 and ARM64 where published</p>
           </div>
         </article>
 
         <article class="installer-card" data-installer="windows">
           <div class="card-main">
-            <span class="badge">PowerShell</span>
             <h3>Windows</h3>
             <p class="card-description">Installs for the current user and adds <code>atomscan</code> to PATH.</p>
             <div class="terminal terminal-windows">
               <div class="terminal-bar" aria-hidden="true">
                 <span class="terminal-app">&gt;_</span>
-                <span class="terminal-label">Windows PowerShell</span>
+                <span class="terminal-label">Terminal</span>
                 <span class="window-controls"><span class="window-control">—</span><span class="window-control">□</span><span class="window-control">×</span></span>
               </div>
               <div class="command-row">
-                <code>irm https://install.atomdrift.org/scan.ps1 | iex</code>
+                <code><span class="command-prefix">irm </span><span class="command-target">https://install.atomdrift.org/scan.ps1 | iex</span></code>
                 <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/scan.ps1 | iex" aria-label="Copy PowerShell install command">copy</button>
               </div>
             </div>
@@ -312,7 +316,6 @@
           <div class="support">
             <p class="support-title">Runs on</p>
             <p class="support-copy">Windows 10 · Windows 11 · Windows Server 2022</p>
-            <p class="requirements">PowerShell 5.1+ · x86-64</p>
           </div>
         </article>
 

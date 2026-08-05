@@ -26,7 +26,7 @@ assert_page_contains 'SHA256SUMS'
 assert_page_contains 'before replacing anything'
 assert_page_contains 'class="terminal terminal-windows"'
 assert_page_contains 'class="window-controls"'
-assert_page_contains 'Windows PowerShell'
+assert_page_contains 'class="command-target"'
 
 if grep -F 'atomdrift/tap' "$PAGE" >/dev/null; then
 	fail 'installer page still uses the legacy tap namespace'
