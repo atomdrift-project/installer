@@ -143,9 +143,9 @@ parse_args() {
 # ---------------------------------------------------------------------------
 # Style
 #
-# Match Scan's litmus palette: green for success, amber for attention, red for
-# failure, and neutral grey for ordinary progress. Redirected output and
-# NO_COLOR remain clean plain text.
+# Follow the Atomdrift website: blue for motion, toxic lime for completion,
+# amber for attention, red for failure, and a readable neutral for supporting
+# detail. Redirected output and NO_COLOR remain clean plain text.
 # ---------------------------------------------------------------------------
 
 setup_style() {
@@ -205,6 +205,10 @@ note() {
 	if [ "$OPT_QUIET" = 0 ]; then
 		printf '   %s%s%s\n' "$C_DIM" "$1" "$C_RESET"
 	fi
+}
+
+gap() {
+	[ "$OPT_QUIET" = 1 ] || printf '\n'
 }
 
 warn() {
@@ -554,12 +558,13 @@ approve_privilege() {
 		PRIVILEGE_DENIED=1
 		return 1
 	fi
-	printf '\n %s%s%s %sPermission needed%s\n   %s\n   Allow %s for this install? [y/N] ' \
+	printf ' %s%s%s %sPermission needed%s\n   %s\n   Allow %s for this install? [y/N] ' \
 		"$C_AMBER" "$G_WARN" "$C_RESET" "$C_BOLD" "$C_RESET" "$ap_command" "$INSTALL_ESCALATOR" >/dev/tty
 	IFS= read -r ap_answer </dev/tty || ap_answer=""
 	case $ap_answer in
 	[yY] | [yY][eE][sS])
 		PRIVILEGE_APPROVED=1
+		gap
 		return 0
 		;;
 	*)
@@ -594,6 +599,7 @@ use_install_dir() {
 		return 0
 	fi
 	uid_display="$uid_cmd mkdir -p $(quote_arg "$uid_dir")"
+	[ "$PRIVILEGE_APPROVED" = 1 ] || gap
 	approve_privilege "$uid_display" || return 1
 	if "$uid_cmd" mkdir -p "$uid_dir" && [ -d "$uid_dir" ]; then
 		INSTALL_DIR=$uid_dir
@@ -687,6 +693,41 @@ installed_version() {
 	printf '%s' "$iv_out" | awk '{ print $2; exit }'
 }
 
+# Recognize an exact current install without requiring its directory to be
+# writable. An idempotent rerun should not need Rust or privilege merely to do
+# nothing.
+use_current_if_exact() {
+	[ "$OPT_FORCE" = 0 ] || return 1
+	[ -n "$VERSION" ] || return 1
+	ucie_path="" ucie_from_path=0
+	if [ -n "$OPT_DIR" ]; then
+		ucie_path="$OPT_DIR/$BIN"
+	elif [ -n "$INSTALL_DIR" ]; then
+		ucie_path="$INSTALL_DIR/$BIN"
+	else
+		ucie_path=$(current_install || :)
+		ucie_from_path=1
+	fi
+	[ -n "$ucie_path" ] || return 1
+	[ "$(installed_version "$ucie_path" || :)" = "$VERSION" ] || return 1
+
+	ucie_dir=$(dirname "$ucie_path")
+	if [ "$ucie_from_path" = 1 ]; then
+		if [ -n "$BREW_PREFIX" ] && [ "${ucie_dir#"$BREW_PREFIX"}" != "$ucie_dir" ]; then
+			return 1
+		fi
+		ucie_os=$(uname -s 2>/dev/null || echo unknown)
+		if [ "$ucie_os" != Linux ]; then
+			case $ucie_dir in /bin | /sbin | /usr/bin | /usr/sbin) return 1 ;; esac
+		fi
+	fi
+
+	INSTALL_DIR=$ucie_dir
+	INSTALLED=$ucie_path
+	ALREADY_CURRENT=1
+	return 0
+}
+
 resolve_install_dir() {
 	INSTALL_PRIVILEGED=0
 	INSTALL_ESCALATOR=""
@@ -715,9 +756,12 @@ resolve_install_dir() {
 		if [ "$rid_os" != Linux ]; then
 			case $rid_dir in /bin | /sbin | /usr/bin | /usr/sbin) rid_system_core=1 ;; esac
 		fi
-		if [ "$rid_brewed" = 0 ] && [ "$rid_system_core" = 0 ] && writable_dir "$rid_dir"; then
-			INSTALL_DIR=$rid_dir
-			return 0
+		if [ "$rid_brewed" = 0 ] && [ "$rid_system_core" = 0 ]; then
+			if use_install_dir "$rid_dir"; then
+				return 0
+			fi
+			die "the existing $rid_cur cannot be upgraded in place
+   Re-run with --dir to choose a different destination, or install doas, pfexec, or sudo."
 		fi
 	fi
 
@@ -768,7 +812,12 @@ install_binary_file() {
 	ibf_tmp="$INSTALL_DIR/.$BIN.new.$$"
 	if [ "$INSTALL_PRIVILEGED" = 1 ]; then
 		ibf_display="$INSTALL_ESCALATOR cp $(quote_arg "$1") $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR chmod 755 $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR mv -f $(quote_arg "$ibf_tmp") $(quote_arg "$ibf_dest")"
-		approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
+		if [ "$PRIVILEGE_APPROVED" = 1 ]; then
+			step privilege "$INSTALL_ESCALATOR  ${C_DIM}(atomic binary install)${C_RESET}"
+		else
+			gap
+			approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
+		fi
 		INSTALL_TMP=$ibf_tmp
 		"$INSTALL_ESCALATOR" cp "$1" "$ibf_tmp" || {
 			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
@@ -904,6 +953,7 @@ install_binary() {
 		warn "release v$VERSION publishes no binary for $TARGET"
 		return 1
 	fi
+	use_current_if_exact && return 0
 
 	# Do not prepare or elevate into a destination until the release asset this
 	# path intends to install is known to exist.
@@ -1004,6 +1054,22 @@ make_source_stage() {
 install_source() {
 	step method "source  ${C_DIM}git + cargo${C_RESET}"
 
+	is_ref=""
+	if [ -n "$OPT_VERSION" ]; then
+		is_ref="v$OPT_VERSION"
+	elif [ -n "$VERSION" ]; then
+		# Auto mode may already have resolved the release before discovering that
+		# this platform has no archive. Reuse it instead of making another request.
+		is_ref="v$VERSION"
+	else
+		[ -n "$DOWNLOADER" ] || find_downloader
+		is_latest=$(resolve_latest || :)
+		[ -n "$is_latest" ] || die "could not work out the latest source release; re-run or specify --version"
+		is_ref=$is_latest
+	fi
+	VERSION=${is_ref#v}
+	use_current_if_exact && return 0
+
 	if ! command -v cargo >/dev/null 2>&1 || ! command -v rustc >/dev/null 2>&1; then
 		die "a source build needs Rust 1.94 or newer:
    $(rust_hint)
@@ -1021,21 +1087,6 @@ install_source() {
 		! command -v clang >/dev/null 2>&1; then
 		die "a source build needs a C/C++ toolchain (cc, gcc, or clang)"
 	fi
-
-	is_ref=""
-	if [ -n "$OPT_VERSION" ]; then
-		is_ref="v$OPT_VERSION"
-	elif [ -n "$VERSION" ]; then
-		# Auto mode may already have resolved the release before discovering that
-		# this platform has no archive. Reuse it instead of making another request.
-		is_ref="v$VERSION"
-	else
-		[ -n "$DOWNLOADER" ] || find_downloader
-		is_latest=$(resolve_latest || :)
-		[ -n "$is_latest" ] || die "could not work out the latest source release; re-run or specify --version"
-		is_ref=$is_latest
-	fi
-	VERSION=${is_ref#v}
 
 	# Source prerequisites and the requested release are now known-good. Only at
 	# this point may destination preparation ask for privilege or change a prefix.
@@ -1281,6 +1332,7 @@ check_tools() {
 	if [ "$OPT_TOOLS" = 0 ]; then
 		return 0
 	fi
+	gap
 	detect_pkg_manager || :
 	ct_ready="" ct_unavailable="" ct_not_installed="" ct_packages="" ct_installing=""
 
@@ -1339,6 +1391,7 @@ path_advice() {
 	pa_dir=$(dirname "$INSTALLED")
 	on_path "$pa_dir" && return 0
 
+	gap
 	warn "$pa_dir is not on your PATH"
 	case "$(basename "${SHELL:-sh}")" in
 	fish) note "fish_add_path $pa_dir" ;;
@@ -1359,6 +1412,7 @@ shadow_check() {
 	[ -n "$sc_found" ] || return 0
 	[ "$sc_found" != "$INSTALLED" ] || return 0
 	on_path "$(dirname "$INSTALLED")" || return 0
+	gap
 	warn "an earlier $BIN on your PATH will still win: $sc_found"
 }
 

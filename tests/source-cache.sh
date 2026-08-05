@@ -88,7 +88,13 @@ EOF
 rustc() { printf 'rustc %s (test toolchain)\n' "$MOCK_RUST_VERSION"; }
 
 uname() { printf '%s\n' FreeBSD; }
-installed_version() { return 1; }
+installed_version() {
+	if [ -n "${MOCK_CURRENT:-}" ] && [ "$1" = "$MOCK_CURRENT" ]; then
+		printf '%s' 2.5.0
+		return 0
+	fi
+	return 1
+}
 install_binary_file() { INSTALLED=$1; }
 
 setup_style
@@ -102,10 +108,40 @@ export HOME XDG_CACHE_HOME
 
 source_dir="$XDG_CACHE_HOME/atomdrift/scan"
 destination_marker="$fixture_root/destination-prepared"
+MOCK_CURRENT=""
+current_install() {
+	[ -n "$MOCK_CURRENT" ] || return 1
+	printf '%s\n' "$MOCK_CURRENT"
+}
 resolve_install_dir() {
 	: >"$destination_marker"
 	INSTALL_DIR="$fixture_root/bin"
 }
+
+# A protected/current PATH install is already a successful source outcome. It
+# must not require the build toolchain or create a second, shadowed copy.
+current_dir="$fixture_root/current/bin"
+mkdir -p "$current_dir"
+cat >"$current_dir/atomscan" <<'EOF'
+#!/bin/sh
+printf '%s\n' 'atomscan 2.5.0'
+EOF
+chmod 755 "$current_dir/atomscan"
+MOCK_CURRENT="$current_dir/atomscan"
+MOCK_RUST_VERSION=1.93.9
+OPT_FORCE=0
+INSTALL_DIR=""
+install_source
+[ "$INSTALLED" = "$MOCK_CURRENT" ] || fail 'current PATH install was replaced by a shadowing copy'
+[ "$ALREADY_CURRENT" = 1 ] || fail 'current PATH install was not recognized as idempotent'
+[ ! -e "$destination_marker" ] || fail 'current PATH install prepared another destination'
+[ ! -e "$source_dir" ] || fail 'current PATH install touched the source cache'
+
+MOCK_CURRENT=""
+INSTALLED=""
+ALREADY_CURRENT=0
+VERSION=""
+OPT_FORCE=1
 
 # Reject an old compiler before resolving a release, preparing a destination,
 # requesting privilege, or touching the cache.

@@ -177,6 +177,10 @@ function Write-Note([string]$Text) {
 	Write-Host ("   {0}{1}{2}" -f $script:CDim, $Text, $script:CReset)
 }
 
+function Write-Gap {
+	if (-not $Quiet) { Write-Host '' }
+}
+
 function Write-Warn([string]$Text) {
 	Write-Host (" {0}{1}{2} {3}" -f $script:CAmber, $script:GWarn, $script:CReset, $Text)
 }
@@ -697,6 +701,7 @@ function Test-WingetPackage([string]$Id) {
 
 function Show-OptionalTools {
 	if ($NoTools) { return }
+	Write-Gap
 
 	$scoop = [bool](Get-Command scoop -ErrorAction SilentlyContinue)
 	$winget = [bool](Get-Command winget -ErrorAction SilentlyContinue)
@@ -852,6 +857,7 @@ function Invoke-Install {
 
 	if (-not $NoPath) {
 		if (Add-ToUserPath (Split-Path -Parent $script:Installed)) {
+			Write-Gap
 			Write-Ok 'path' "added $(Split-Path -Parent $script:Installed) to your user PATH"
 			Write-Note 'open a new terminal for it to take effect everywhere'
 		}
@@ -859,6 +865,7 @@ function Invoke-Install {
 
 	$found = Get-Command $BinName -ErrorAction SilentlyContinue
 	if ($found -and $found.Source -and $found.Source -ne $script:Installed) {
+		Write-Gap
 		Write-Warn "an earlier $BinName on your PATH will still win: $($found.Source)"
 	}
 
