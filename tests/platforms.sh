@@ -90,19 +90,19 @@ assert_platform 'Linux/openEuler x86_64 glibc' Linux x86_64 GNU/Linux test 0 0 x
 assert_platform 'Linux arm64 glibc' Linux arm64 GNU/Linux test 0 0 aarch64-unknown-linux-gnu
 assert_platform 'Linux x86_64 musl' Linux x86_64 GNU/Linux test 0 1 x86_64-unknown-linux-musl
 assert_platform 'Linux arm64 musl' Linux aarch64 GNU/Linux test 0 1 aarch64-unknown-linux-musl
-assert_platform 'Android/BlissOS' Linux x86_64 Android test 0 0 x86_64-unknown-linux-musl
+assert_platform 'Android' Linux x86_64 Android test 0 0 x86_64-unknown-linux-musl
 assert_platform 'Linux s390x' Linux s390x GNU/Linux test 0 0 s390x-unknown-linux-gnu
 assert_platform 'Linux riscv64' Linux riscv64 GNU/Linux test 0 0 riscv64gc-unknown-linux-gnu
 assert_platform 'Linux powerpc64le' Linux ppc64le GNU/Linux test 0 0 powerpc64le-unknown-linux-gnu
 assert_platform 'macOS arm64' Darwin arm64 Darwin test 0 0 aarch64-apple-darwin
 assert_platform 'macOS x86_64' Darwin x86_64 Darwin test 0 0 x86_64-apple-darwin
 assert_platform 'macOS Rosetta' Darwin x86_64 Darwin test 1 0 aarch64-apple-darwin
-assert_platform 'FreeBSD/GhostBSD' FreeBSD amd64 FreeBSD test 0 0 x86_64-unknown-freebsd
+assert_platform 'FreeBSD' FreeBSD amd64 FreeBSD test 0 0 x86_64-unknown-freebsd
 assert_platform 'OpenBSD' OpenBSD amd64 OpenBSD test 0 0 x86_64-unknown-openbsd
 assert_platform 'NetBSD' NetBSD amd64 NetBSD test 0 0 x86_64-unknown-netbsd
 assert_platform 'DragonFly BSD' DragonFly x86_64 DragonFly test 0 0 x86_64-unknown-dragonfly
-assert_platform 'Haiku' Haiku x86_64 Haiku test 0 0 x86_64-unknown-haiku
-assert_platform 'GNU/Hurd' GNU x86_64 GNU test 0 0 x86_64-unknown-hurd-gnu
+assert_platform 'experimental Haiku mapping' Haiku x86_64 Haiku test 0 0 x86_64-unknown-haiku
+assert_platform 'experimental GNU/Hurd mapping' GNU x86_64 GNU test 0 0 x86_64-unknown-hurd-gnu
 assert_platform 'illumos/OpenIndiana/Tribblix' SunOS i86pc illumos 'omnios-r151058' 0 0 x86_64-unknown-illumos
 assert_platform 'Solaris' SunOS i86pc Solaris '11.4' 0 0 x86_64-pc-solaris
 

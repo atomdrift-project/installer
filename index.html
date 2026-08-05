@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Install Atomdrift Scan on Linux, macOS, Windows, BSD, Haiku, GNU/Hurd, Solaris, and illumos.">
+  <meta name="description" content="Install Atomdrift Scan on Linux, macOS, Windows, BSD, Android, Solaris, and illumos.">
   <meta name="theme-color" content="#d0ff00">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Install Atomdrift Scan">
@@ -207,7 +207,7 @@
     .installer-card[data-installer="homebrew"] {
       display: grid;
       grid-column: 1 / -1;
-      grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+      grid-template-columns: minmax(0, 1fr) 210px;
     }
 
     .installer-card[data-installer="homebrew"] .support {
@@ -225,7 +225,10 @@
     .command-row { align-items: center; display: flex; gap: 10px; min-width: 0; padding: 14px; }
     .command-row code { color: #fff; flex: 1; font: 12.5px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
     .command-row code::before { color: var(--toxic); content: "$ "; }
-    .command-row code.multiline { white-space: pre; }
+    .command-row code.multiline { white-space: normal; }
+    .command-row code.multiline::before { content: none; }
+    .command-line { display: block; }
+    .command-line::before { color: var(--toxic); content: "$ "; }
 
     .copy-button {
       background: #222;
@@ -243,8 +246,10 @@
 
     .support { background: var(--cream); border-top: 1px solid var(--border); padding: 16px 22px 19px; }
     .support-title { color: var(--iron); font: 700 10px var(--mono); letter-spacing: .08em; margin-bottom: 9px; text-transform: uppercase; }
+    .support-title:not(:first-child) { margin-top: 14px; }
     .os-list { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; }
     .os-list li { background: var(--white); border: 1px solid var(--border); border-radius: 5px; color: var(--graphite); font-size: 12px; padding: 3px 7px; }
+    .requirements { color: var(--graphite); font: 12px/1.55 var(--mono); }
 
     .alternatives { display: grid; grid-template-columns: 1fr; gap: 18px; }
     .alternative { border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
@@ -362,6 +367,28 @@
       </div>
 
       <div class="installer-grid">
+        <article class="installer-card" data-installer="homebrew">
+          <div class="card-main">
+            <div class="card-kicker"><span class="method-kind">Package manager</span><span class="badge">Homebrew</span></div>
+            <h3>Homebrew</h3>
+            <p class="card-description">Installs from the Atomdrift tap. Homebrew controls the prefix, dependency handling, upgrades, and package removal.</p>
+            <div class="terminal">
+              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
+              <div class="command-row">
+                <code class="multiline">
+                  <span class="command-line">brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git</span>
+                  <span class="command-line">brew install atomdrift/tap/scan</span>
+                </code>
+                <button class="copy-button" type="button" data-copy="brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git&#10;brew install atomdrift/tap/scan" aria-label="Copy Homebrew install commands">copy</button>
+              </div>
+            </div>
+          </div>
+          <div class="support">
+            <p class="support-title">Supported operating systems</p>
+            <ul class="os-list"><li>macOS</li><li>Linux</li></ul>
+          </div>
+        </article>
+
         <article class="installer-card" data-installer="unix">
           <div class="card-main">
             <div class="card-kicker"><span class="method-kind">Installer</span><span class="badge">POSIX sh</span></div>
@@ -378,8 +405,10 @@
           <div class="support">
             <p class="support-title">Supported operating systems</p>
             <ul class="os-list">
-              <li>macOS</li><li>Linux (glibc)</li><li>Linux (musl)</li><li>Fedora / Silverblue</li><li>Debian</li><li>Ubuntu</li><li>openSUSE</li><li>Alpine</li><li>Wolfi</li><li>openEuler</li><li>FreeBSD</li><li>OpenBSD</li><li>NetBSD</li><li>DragonFly BSD</li><li>GhostBSD</li><li>Haiku</li><li>GNU/Hurd</li><li>Solaris</li><li>illumos</li><li>Android / BlissOS</li>
+              <li>macOS</li><li>Linux (glibc)</li><li>Linux (musl)</li><li>Fedora</li><li>Debian</li><li>Ubuntu</li><li>openSUSE</li><li>Alpine</li><li>Wolfi</li><li>openEuler</li><li>FreeBSD</li><li>OpenBSD</li><li>NetBSD</li><li>DragonFly BSD</li><li>Solaris</li><li>illumos</li><li>Android</li>
             </ul>
+            <p class="support-title">Requirements and targets</p>
+            <p class="requirements">POSIX sh · curl, wget, fetch, or ftp · gzip · tar. BSD, Solaris, and illumos release binaries are x86-64. macOS and Linux also publish ARM64 binaries; Android uses the Linux musl artifact.</p>
           </div>
         </article>
 
@@ -387,7 +416,7 @@
           <div class="card-main">
             <div class="card-kicker"><span class="method-kind">Installer</span><span class="badge">PowerShell</span></div>
             <h3>PowerShell installer</h3>
-            <p class="card-description">Installs into the current user profile and adds the destination to the user PATH. Supports Windows PowerShell and PowerShell 7.</p>
+            <p class="card-description">Installs into the current user profile and adds the destination to the user PATH.</p>
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">powershell</span></div>
               <div class="command-row">
@@ -399,30 +428,13 @@
           <div class="support">
             <p class="support-title">Supported operating systems</p>
             <ul class="os-list">
-              <li>Windows 10</li><li>Windows 11</li><li>Windows Server 2022</li><li>PowerShell 5.1</li><li>PowerShell 7</li><li>x86-64</li>
+              <li>Windows 10</li><li>Windows 11</li><li>Windows Server 2022</li>
             </ul>
+            <p class="support-title">Requirements</p>
+            <p class="requirements">x86-64 · Windows PowerShell 5.1 or PowerShell 7 · Windows 10 build 17063+ for binary installation</p>
           </div>
         </article>
 
-        <article class="installer-card" data-installer="homebrew">
-          <div class="card-main">
-            <div class="card-kicker"><span class="method-kind">Package manager</span><span class="badge">Homebrew</span></div>
-            <h3>Homebrew</h3>
-            <p class="card-description">Installs from the Atomdrift tap. Homebrew controls the prefix, dependency handling, upgrades, and package removal.</p>
-            <div class="terminal">
-              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
-              <div class="command-row">
-                <code class="multiline">brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git
-brew install atomdrift/tap/scan</code>
-                <button class="copy-button" type="button" data-copy="brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git&#10;brew install atomdrift/tap/scan" aria-label="Copy Homebrew install commands">copy</button>
-              </div>
-            </div>
-          </div>
-          <div class="support">
-            <p class="support-title">Supported operating systems</p>
-            <ul class="os-list"><li>macOS</li><li>Linux</li></ul>
-          </div>
-        </article>
       </div>
     </section>
 
