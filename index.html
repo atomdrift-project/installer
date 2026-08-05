@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install Atomdrift Scan on Linux, macOS, Windows, BSD, Haiku, GNU/Hurd, Solaris, and illumos.">
+  <meta name="theme-color" content="#d0ff00">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Install Atomdrift Scan">
+  <meta property="og:description" content="One friendly installer for a surprisingly large collection of computers.">
+  <title>Install Atomdrift Scan</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>%E2%9A%9B</text></svg>">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --carbon: #0a0a0a;
+      --graphite: #404040;
+      --iron: #52525b;
+      --slate: #6b7280;
+      --mist: #f5f5f5;
+      --white: #fff;
+      --cream: #fafaf9;
+      --border: #e8e8e8;
+      --blue: #3b82f6;
+      --blue-dim: rgba(59, 130, 246, 0.1);
+      --toxic: #d0ff00;
+      --toxic-muted: #9abe25;
+      --toxic-dark: #4a6b0f;
+      --toxic-dim: rgba(208, 255, 0, 0.14);
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --display: Oxanium, "Arial Narrow", sans-serif;
+      --body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html { color-scheme: light; scroll-behavior: smooth; }
+
+    body {
+      background: var(--white);
+      color: var(--carbon);
+      font-family: var(--body);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    a:hover { text-decoration-thickness: 2px; }
+    a:focus-visible, button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+
+    .site-header {
+      border-bottom: 1px solid var(--border);
+      background: var(--white);
+      padding: 14px 0;
+    }
+
+    .header-inner, .nav-inner, main, .footer-inner {
+      max-width: 1000px;
+      margin-inline: auto;
+      width: calc(100% - 40px);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .atom-logo { width: 38px; height: 38px; flex: 0 0 auto; }
+    .brand-copy { display: flex; flex-direction: column; }
+
+    .brand-name {
+      font-family: var(--display);
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+
+    .brand-name span { color: var(--toxic-muted); }
+    .brand-tagline { color: var(--iron); font-size: 14px; margin-top: 3px; }
+
+    .header-links { display: flex; gap: 8px; }
+
+    .header-links a {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--graphite);
+      font-size: 14px;
+      padding: 7px 14px;
+      text-decoration: none;
+    }
+
+    .header-links a:last-child { background: var(--carbon); border-color: var(--carbon); color: var(--white); }
+    .header-links a:hover { border-color: var(--blue); }
+
+    .toxic-stripe { height: 4px; background: linear-gradient(90deg, var(--toxic), var(--toxic-muted) 52%, transparent); }
+
+    .nav { background: var(--mist); border-bottom: 1px solid var(--border); }
+    .nav-inner { display: flex; }
+    .nav a { border-inline: 1px solid var(--border); color: var(--graphite); font-size: 14px; padding: 9px 17px; text-decoration: none; }
+    .nav a + a { border-left: 0; }
+    .nav a.active { background: var(--cream); border-bottom: 2px solid var(--blue); margin-bottom: -1px; font-weight: 600; }
+
+    main { padding-block: 42px 20px; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 42px clamp(24px, 6vw, 58px);
+      margin-bottom: 26px;
+    }
+
+    .hero::after {
+      content: "⚛";
+      position: absolute;
+      right: -14px;
+      top: -55px;
+      color: var(--toxic);
+      font-size: 220px;
+      line-height: 1;
+      opacity: .55;
+      transform: rotate(-12deg);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      color: var(--toxic-dark);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { font-family: var(--display); }
+
+    h1 {
+      font-size: clamp(34px, 6vw, 58px);
+      letter-spacing: -2px;
+      line-height: 1.02;
+      max-width: 700px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-copy {
+      color: var(--graphite);
+      font-size: 18px;
+      margin-top: 18px;
+      max-width: 620px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .promise-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; position: relative; z-index: 1; }
+    .promise { background: var(--white); border: 1px solid var(--border); border-radius: 999px; color: var(--iron); font-size: 13px; padding: 5px 10px; }
+    .promise::first-letter { color: var(--toxic-dark); }
+
+    .section-head { align-items: end; display: flex; justify-content: space-between; gap: 20px; margin: 34px 0 15px; }
+    .section-head h2 { font-size: 22px; letter-spacing: -.4px; }
+    .section-head p { color: var(--slate); font-size: 14px; }
+
+    .installer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; min-width: 0; }
+
+    .installer-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+      transition: box-shadow .2s, transform .2s;
+    }
+
+    .installer-card:hover, .installer-card.recommended {
+      box-shadow: -4px 0 0 var(--toxic), 0 10px 28px rgba(10, 10, 10, .06);
+      transform: translateY(-2px);
+    }
+
+    .card-main { flex: 1; padding: 22px; }
+    .card-kicker { align-items: center; display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .card-kicker span:first-child { font-size: 24px; }
+    .badge { background: var(--toxic-dim); border: 1px solid rgba(154, 190, 37, .28); border-radius: 5px; color: var(--toxic-dark); font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 7px; text-transform: uppercase; }
+    .installer-card h3 { font-size: 21px; letter-spacing: -.3px; }
+    .card-description { color: var(--graphite); font-size: 14px; margin-top: 5px; }
+
+    .terminal { background: var(--carbon); border-radius: 9px; color: #f4f4f5; margin-top: 17px; overflow: hidden; }
+    .terminal-bar { align-items: center; border-bottom: 1px solid #292929; display: flex; gap: 6px; padding: 9px 11px; }
+    .terminal-dot { border-radius: 50%; height: 7px; width: 7px; }
+    .terminal-dot:nth-child(1) { background: #ff4646; }
+    .terminal-dot:nth-child(2) { background: #ffaf37; }
+    .terminal-dot:nth-child(3) { background: #50c850; }
+    .terminal-label { color: #8b8b92; font: 10px var(--mono); margin-left: 4px; text-transform: uppercase; }
+    .command-row { align-items: center; display: flex; gap: 10px; min-width: 0; padding: 14px; }
+    .command-row code { color: #fff; flex: 1; font: 12.5px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
+    .command-row code::before { color: var(--toxic); content: "$ "; }
+
+    .copy-button {
+      background: #222;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      color: #d4d4d8;
+      cursor: pointer;
+      flex: 0 0 auto;
+      font: 11px var(--mono);
+      padding: 7px 9px;
+    }
+
+    .copy-button:hover { border-color: var(--toxic-muted); color: var(--toxic); }
+    .copy-button.copied { background: var(--toxic); border-color: var(--toxic); color: var(--carbon); }
+
+    .support { background: var(--cream); border-top: 1px solid var(--border); padding: 16px 22px 19px; }
+    .support-title { color: var(--iron); font: 700 10px var(--mono); letter-spacing: .08em; margin-bottom: 9px; text-transform: uppercase; }
+    .os-list { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; }
+    .os-list li { background: var(--white); border: 1px solid var(--border); border-radius: 5px; color: var(--graphite); font-size: 12px; padding: 3px 7px; }
+
+    .alternatives { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .alternative { border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .alternative h3 { align-items: center; display: flex; font-size: 17px; gap: 8px; }
+    .alternative p { color: var(--iron); font-size: 14px; margin: 7px 0 12px; }
+    .mini-command { background: var(--mist); border-radius: 7px; display: flex; gap: 10px; padding: 11px 12px; }
+    .mini-command code { flex: 1; font: 12px/1.5 var(--mono); overflow-x: auto; white-space: pre; }
+    .text-link { font-size: 14px; font-weight: 600; }
+
+    .matrix {
+      background: var(--carbon);
+      border-radius: 14px;
+      color: var(--white);
+      display: grid;
+      gap: 1px;
+      grid-template-columns: repeat(4, 1fr);
+      overflow: hidden;
+    }
+
+    .matrix-group { background: #111; padding: 18px; }
+    .matrix-group h3 { color: var(--toxic); font-size: 14px; margin-bottom: 7px; }
+    .matrix-group p { color: #a1a1aa; font-size: 12.5px; line-height: 1.55; }
+
+    .fine-print { color: var(--slate); font-size: 13px; margin-top: 13px; }
+    .fine-print code { background: var(--mist); border-radius: 3px; font-family: var(--mono); padding: 1px 4px; }
+
+    .site-footer { background: var(--carbon); color: var(--slate); font-size: 13px; margin-top: 42px; padding: 20px 0; position: relative; }
+    .site-footer::before { background: var(--toxic); content: ""; height: 3px; left: 0; position: absolute; top: 0; width: 90px; }
+    .footer-inner { display: flex; justify-content: space-between; gap: 20px; }
+    .footer-inner a { color: #a1a1aa; }
+
+    @media (max-width: 760px) {
+      .brand-tagline { display: none; }
+      .header-links a:first-child { display: none; }
+      main { padding-top: 24px; }
+      .hero { padding: 30px 24px; }
+      .hero::after { font-size: 150px; opacity: .32; }
+      h1 { letter-spacing: -1px; }
+      .installer-grid, .alternatives { grid-template-columns: 1fr; }
+      .matrix { grid-template-columns: repeat(2, 1fr); }
+      .section-head { align-items: start; flex-direction: column; gap: 2px; }
+    }
+
+    @media (max-width: 440px) {
+      .header-inner, .nav-inner, main, .footer-inner { width: calc(100% - 26px); }
+      .header-links a { padding: 6px 9px; }
+      .nav a { padding-inline: 12px; }
+      .matrix { grid-template-columns: 1fr; }
+      .command-row { align-items: stretch; flex-direction: column; }
+      .command-row code { display: block; width: 100%; }
+      .copy-button { align-self: end; }
+      .footer-inner { flex-direction: column; gap: 4px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="https://atomdrift.org/" aria-label="The Atomdrift Project home">
+        <svg class="atom-logo" viewBox="0 0 100 100" role="img" aria-label="Atomdrift">
+          <circle cx="50" cy="50" r="6" fill="#3b82f6"/>
+          <ellipse cx="50" cy="50" rx="38" ry="14" fill="none" stroke="#0a0a0a" stroke-width="1.5" transform="rotate(-30 50 50)"/>
+          <ellipse cx="50" cy="50" rx="38" ry="14" fill="none" stroke="#0a0a0a" stroke-width="1.5" transform="rotate(30 50 50)"/>
+          <ellipse cx="50" cy="50" rx="38" ry="14" fill="none" stroke="#0a0a0a" stroke-width="1.5" transform="rotate(90 50 50)"/>
+          <circle cx="18" cy="28" r="3.5" fill="#d0ff00"/>
+          <circle cx="82" cy="28" r="3.5" fill="#d0ff00"/>
+          <circle cx="50" cy="88" r="3.5" fill="#d0ff00"/>
+        </svg>
+        <span class="brand-copy">
+          <span class="brand-name">atom<span>drift</span></span>
+          <span class="brand-tagline">Open-source, local-first supply-chain attack detection</span>
+        </span>
+      </a>
+      <nav class="header-links" aria-label="External links">
+        <a href="https://atomdrift.org/scan/">About Scan</a>
+        <a href="https://github.com/atomdrift-project/installer">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="toxic-stripe"></div>
+  <nav class="nav" aria-label="Installer navigation">
+    <div class="nav-inner">
+      <a class="active" href="#installers">Install</a>
+      <a href="#downloads">Downloads</a>
+      <a href="#support">Platforms</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">atomscan / install</p>
+      <h1>Your machine called.<br>It wants a scanner.</h1>
+      <p class="hero-copy">Pick a shell, paste one command, and let the installer find the right verified Atomdrift Scan build for your machine.</p>
+      <div class="promise-row" aria-label="Installer features">
+        <span class="promise">✓ SHA-256 verified</span>
+        <span class="promise">✓ PATH-aware</span>
+        <span class="promise">✓ no cloud scanner</span>
+        <span class="promise">✓ safe to re-run</span>
+      </div>
+    </section>
+
+    <section id="installers" aria-labelledby="installers-title">
+      <div class="section-head">
+        <h2 id="installers-title">Choose your shell</h2>
+        <p id="recommendation" aria-live="polite">Both installers fetch the same release.</p>
+      </div>
+
+      <div class="installer-grid">
+        <article class="installer-card" data-installer="unix">
+          <div class="card-main">
+            <div class="card-kicker"><span aria-hidden="true">🐚</span><span class="badge">POSIX shell</span></div>
+            <h3>macOS, Linux &amp; Unix</h3>
+            <p class="card-description">Detects the OS, CPU, and libc; installs a verified binary or builds from source when a release is unavailable.</p>
+            <div class="terminal">
+              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
+              <div class="command-row">
+                <code>curl -fsSL https://install.atomdrift.org | sh</code>
+                <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org | sh" aria-label="Copy POSIX shell install command">copy</button>
+              </div>
+            </div>
+          </div>
+          <div class="support">
+            <p class="support-title">Supported operating systems</p>
+            <ul class="os-list">
+              <li>macOS</li><li>Linux (glibc)</li><li>Linux (musl)</li><li>FreeBSD</li><li>OpenBSD</li><li>NetBSD</li><li>DragonFly BSD</li><li>Haiku</li><li>GNU/Hurd</li><li>Solaris</li><li>illumos</li><li>Android / BlissOS</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="installer-card" data-installer="windows">
+          <div class="card-main">
+            <div class="card-kicker"><span aria-hidden="true">🪟</span><span class="badge">PowerShell</span></div>
+            <h3>Windows</h3>
+            <p class="card-description">Installs per-user, adds Atomdrift Scan to your user PATH, and works with both inbox Windows PowerShell and modern PowerShell.</p>
+            <div class="terminal">
+              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">powershell</span></div>
+              <div class="command-row">
+                <code>irm https://install.atomdrift.org/ps1 | iex</code>
+                <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/ps1 | iex" aria-label="Copy PowerShell install command">copy</button>
+              </div>
+            </div>
+          </div>
+          <div class="support">
+            <p class="support-title">Supported operating systems</p>
+            <ul class="os-list">
+              <li>Windows 10</li><li>Windows 11</li><li>Windows Server 2022</li><li>PowerShell 5.1</li><li>PowerShell 7</li><li>x86-64</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="downloads" aria-labelledby="downloads-title">
+      <div class="section-head">
+        <h2 id="downloads-title">Prefer to steer?</h2>
+        <p>Package managers and manual downloads are welcome too.</p>
+      </div>
+      <div class="alternatives">
+        <article class="alternative">
+          <h3><span aria-hidden="true">🍺</span> Homebrew</h3>
+          <p>For macOS or Linux. Homebrew owns the install location and future upgrades.</p>
+          <div class="mini-command">
+            <code>brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git
+brew install atomdrift/tap/scan</code>
+            <button class="copy-button" type="button" data-copy="brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git&#10;brew install atomdrift/tap/scan" aria-label="Copy Homebrew install commands">copy</button>
+          </div>
+        </article>
+        <article class="alternative">
+          <h3><span aria-hidden="true">📦</span> Manual download</h3>
+          <p>Choose your target archive from GitHub Releases, then compare it with the release’s <code>SHA256SUMS</code> before installing.</p>
+          <a class="text-link" href="https://github.com/atomdrift-project/scan/releases/latest">Open the latest Scan release →</a>
+        </article>
+      </div>
+    </section>
+
+    <section id="support" aria-labelledby="support-title">
+      <div class="section-head">
+        <h2 id="support-title">The test fleet</h2>
+        <p>Actual installer behavior, not merely shell syntax.</p>
+      </div>
+      <div class="matrix">
+        <div class="matrix-group"><h3>🐧 Linux</h3><p>Fedora / Silverblue userspace, Debian, Ubuntu, openSUSE, Alpine, Wolfi, and openEuler.</p></div>
+        <div class="matrix-group"><h3>😈 BSD</h3><p>FreeBSD, OpenBSD, NetBSD, DragonFly BSD, and GhostBSD.</p></div>
+        <div class="matrix-group"><h3>🛰 Other Unix</h3><p>macOS, Haiku, GNU/Hurd, Solaris, OmniOS, OpenIndiana, and Tribblix.</p></div>
+        <div class="matrix-group"><h3>🪟 Windows</h3><p>Windows Server 2022 CI with Windows PowerShell 5.1 compatibility.</p></div>
+      </div>
+      <p class="fine-print">Release binaries cover x86-64, Apple Silicon, Linux ARM64, s390x, RISC-V 64, and Linux PowerPC 64 LE where published. On an otherwise supported Unix without a matching archive, the automatic installer can build from source. Review the <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">shell installer</a> or <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">PowerShell installer</a> before running it.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>© 2026 The Atomdrift Project</span>
+      <span>Apache 2.0 · scans stay local</span>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent;
+      var windows = /win/i.test(platform);
+      var card = document.querySelector('[data-installer="' + (windows ? 'windows' : 'unix') + '"]');
+      var message = document.getElementById('recommendation');
+      if (card) card.classList.add('recommended');
+      if (message) message.textContent = windows ? 'PowerShell looks right for this machine.' : 'The POSIX shell installer looks right for this machine.';
+
+      document.querySelectorAll('[data-copy]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var command = button.getAttribute('data-copy');
+          if (!navigator.clipboard) return;
+          navigator.clipboard.writeText(command).then(function () {
+            button.textContent = 'copied ✓';
+            button.classList.add('copied');
+            window.setTimeout(function () {
+              button.textContent = 'copy';
+              button.classList.remove('copied');
+            }, 1600);
+          });
+        });
+      });
+    }());
+  </script>
+</body>
+</html>

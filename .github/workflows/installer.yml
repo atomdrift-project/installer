@@ -60,6 +60,9 @@ jobs:
           bash --posix tests/install-dir.sh
           zsh --emulate sh tests/install-dir.sh
 
+      - name: Test installer index
+        run: sh tests/index.sh
+
   linux-distros:
     name: Linux / ${{ matrix.name }}
     runs-on: ubuntu-24.04
