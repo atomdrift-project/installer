@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#d0ff00">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Install Atomdrift Scan">
-  <meta property="og:description" content="One friendly installer for a surprisingly large collection of computers.">
+  <meta property="og:description" content="Supported installation methods, release targets, and verification behavior for Atomdrift Scan.">
   <title>Install Atomdrift Scan</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>%E2%9A%9B</text></svg>">
   <style>
@@ -192,17 +192,28 @@
       transition: box-shadow .2s, transform .2s;
     }
 
-    .installer-card:hover, .installer-card.recommended {
+    .installer-card:hover {
       box-shadow: -4px 0 0 var(--toxic), 0 10px 28px rgba(10, 10, 10, .06);
       transform: translateY(-2px);
     }
 
     .card-main { flex: 1; padding: 22px; }
     .card-kicker { align-items: center; display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-    .card-kicker span:first-child { font-size: 24px; }
+    .method-kind { color: var(--slate); font: 700 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
     .badge { background: var(--toxic-dim); border: 1px solid rgba(154, 190, 37, .28); border-radius: 5px; color: var(--toxic-dark); font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 7px; text-transform: uppercase; }
     .installer-card h3 { font-size: 21px; letter-spacing: -.3px; }
     .card-description { color: var(--graphite); font-size: 14px; margin-top: 5px; }
+
+    .installer-card[data-installer="homebrew"] {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+    }
+
+    .installer-card[data-installer="homebrew"] .support {
+      border-left: 1px solid var(--border);
+      border-top: 0;
+    }
 
     .terminal { background: var(--carbon); border-radius: 9px; color: #f4f4f5; margin-top: 17px; overflow: hidden; }
     .terminal-bar { align-items: center; border-bottom: 1px solid #292929; display: flex; gap: 6px; padding: 9px 11px; }
@@ -214,6 +225,7 @@
     .command-row { align-items: center; display: flex; gap: 10px; min-width: 0; padding: 14px; }
     .command-row code { color: #fff; flex: 1; font: 12.5px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
     .command-row code::before { color: var(--toxic); content: "$ "; }
+    .command-row code.multiline { white-space: pre; }
 
     .copy-button {
       background: #222;
@@ -234,7 +246,7 @@
     .os-list { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; }
     .os-list li { background: var(--white); border: 1px solid var(--border); border-radius: 5px; color: var(--graphite); font-size: 12px; padding: 3px 7px; }
 
-    .alternatives { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .alternatives { display: grid; grid-template-columns: 1fr; gap: 18px; }
     .alternative { border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
     .alternative h3 { align-items: center; display: flex; font-size: 17px; gap: 8px; }
     .alternative p { color: var(--iron); font-size: 14px; margin: 7px 0 12px; }
@@ -242,19 +254,21 @@
     .mini-command code { flex: 1; font: 12px/1.5 var(--mono); overflow-x: auto; white-space: pre; }
     .text-link { font-size: 14px; font-weight: 600; }
 
-    .matrix {
-      background: var(--carbon);
+    .behavior-grid {
+      border: 1px solid var(--border);
       border-radius: 14px;
-      color: var(--white);
       display: grid;
       gap: 1px;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       overflow: hidden;
     }
 
-    .matrix-group { background: #111; padding: 18px; }
-    .matrix-group h3 { color: var(--toxic); font-size: 14px; margin-bottom: 7px; }
-    .matrix-group p { color: #a1a1aa; font-size: 12.5px; line-height: 1.55; }
+    .behavior-item { background: var(--cream); border: 1px solid var(--border); margin: -1px 0 0 -1px; padding: 18px; }
+    .behavior-item dt { color: var(--carbon); font: 700 11px var(--mono); letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
+    .behavior-item dd { color: var(--graphite); font-size: 13px; line-height: 1.55; }
+
+    .manual-steps { color: var(--graphite); font-size: 13px; margin: 10px 0 13px 19px; }
+    .manual-steps li { margin-bottom: 3px; padding-left: 3px; }
 
     .fine-print { color: var(--slate); font-size: 13px; margin-top: 13px; }
     .fine-print code { background: var(--mist); border-radius: 3px; font-family: var(--mono); padding: 1px 4px; }
@@ -272,7 +286,9 @@
       .hero::after { font-size: 150px; opacity: .32; }
       h1 { letter-spacing: -1px; }
       .installer-grid, .alternatives { grid-template-columns: 1fr; }
-      .matrix { grid-template-columns: repeat(2, 1fr); }
+      .installer-card[data-installer="homebrew"] { display: flex; grid-column: auto; }
+      .installer-card[data-installer="homebrew"] .support { border-left: 0; border-top: 1px solid var(--border); }
+      .behavior-grid { grid-template-columns: repeat(2, 1fr); }
       .section-head { align-items: start; flex-direction: column; gap: 2px; }
     }
 
@@ -280,7 +296,7 @@
       .header-inner, .nav-inner, main, .footer-inner { width: calc(100% - 26px); }
       .header-links a { padding: 6px 9px; }
       .nav a { padding-inline: 12px; }
-      .matrix { grid-template-columns: 1fr; }
+      .behavior-grid { grid-template-columns: 1fr; }
       .command-row { align-items: stretch; flex-direction: column; }
       .command-row code { display: block; width: 100%; }
       .copy-button { align-self: end; }
@@ -322,35 +338,35 @@
     <div class="nav-inner">
       <a class="active" href="#installers">Install</a>
       <a href="#downloads">Downloads</a>
-      <a href="#support">Platforms</a>
+      <a href="#behavior">Behavior</a>
     </div>
   </nav>
 
   <main>
     <section class="hero">
-      <p class="eyebrow">atomscan / install</p>
-      <h1>Your machine called.<br>It wants a scanner.</h1>
-      <p class="hero-copy">Pick a shell, paste one command, and let the installer find the right verified Atomdrift Scan build for your machine.</p>
+      <p class="eyebrow">atomscan / installation</p>
+      <h1>Install Atomdrift Scan</h1>
+      <p class="hero-copy">Platform-aware installation methods for Atomdrift Scan. Review the installer source, select a supported method, or download a release artifact manually.</p>
       <div class="promise-row" aria-label="Installer features">
-        <span class="promise">✓ SHA-256 verified</span>
-        <span class="promise">✓ PATH-aware</span>
-        <span class="promise">✓ no cloud scanner</span>
-        <span class="promise">✓ safe to re-run</span>
+        <span class="promise">SHA-256 required</span>
+        <span class="promise">PATH-aware destination</span>
+        <span class="promise">pre-install execution check</span>
+        <span class="promise">atomic replacement</span>
       </div>
     </section>
 
     <section id="installers" aria-labelledby="installers-title">
       <div class="section-head">
-        <h2 id="installers-title">Choose your shell</h2>
-        <p id="recommendation" aria-live="polite">Both installers fetch the same release.</p>
+        <h2 id="installers-title">Installation methods</h2>
+        <p>Select by operating system and package-management preference.</p>
       </div>
 
       <div class="installer-grid">
         <article class="installer-card" data-installer="unix">
           <div class="card-main">
-            <div class="card-kicker"><span aria-hidden="true">🐚</span><span class="badge">POSIX shell</span></div>
-            <h3>macOS, Linux &amp; Unix</h3>
-            <p class="card-description">Detects the OS, CPU, and libc; installs a verified binary or builds from source when a release is unavailable.</p>
+            <div class="card-kicker"><span class="method-kind">Installer</span><span class="badge">POSIX sh</span></div>
+            <h3>Shell installer</h3>
+            <p class="card-description">Detects the kernel, CPU architecture, and Linux libc. Uses a release binary when published and otherwise builds from source.</p>
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
               <div class="command-row">
@@ -362,16 +378,16 @@
           <div class="support">
             <p class="support-title">Supported operating systems</p>
             <ul class="os-list">
-              <li>macOS</li><li>Linux (glibc)</li><li>Linux (musl)</li><li>FreeBSD</li><li>OpenBSD</li><li>NetBSD</li><li>DragonFly BSD</li><li>Haiku</li><li>GNU/Hurd</li><li>Solaris</li><li>illumos</li><li>Android / BlissOS</li>
+              <li>macOS</li><li>Linux (glibc)</li><li>Linux (musl)</li><li>Fedora / Silverblue</li><li>Debian</li><li>Ubuntu</li><li>openSUSE</li><li>Alpine</li><li>Wolfi</li><li>openEuler</li><li>FreeBSD</li><li>OpenBSD</li><li>NetBSD</li><li>DragonFly BSD</li><li>GhostBSD</li><li>Haiku</li><li>GNU/Hurd</li><li>Solaris</li><li>illumos</li><li>Android / BlissOS</li>
             </ul>
           </div>
         </article>
 
         <article class="installer-card" data-installer="windows">
           <div class="card-main">
-            <div class="card-kicker"><span aria-hidden="true">🪟</span><span class="badge">PowerShell</span></div>
-            <h3>Windows</h3>
-            <p class="card-description">Installs per-user, adds Atomdrift Scan to your user PATH, and works with both inbox Windows PowerShell and modern PowerShell.</p>
+            <div class="card-kicker"><span class="method-kind">Installer</span><span class="badge">PowerShell</span></div>
+            <h3>PowerShell installer</h3>
+            <p class="card-description">Installs into the current user profile and adds the destination to the user PATH. Supports Windows PowerShell and PowerShell 7.</p>
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">powershell</span></div>
               <div class="command-row">
@@ -387,44 +403,63 @@
             </ul>
           </div>
         </article>
+
+        <article class="installer-card" data-installer="homebrew">
+          <div class="card-main">
+            <div class="card-kicker"><span class="method-kind">Package manager</span><span class="badge">Homebrew</span></div>
+            <h3>Homebrew</h3>
+            <p class="card-description">Installs from the Atomdrift tap. Homebrew controls the prefix, dependency handling, upgrades, and package removal.</p>
+            <div class="terminal">
+              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
+              <div class="command-row">
+                <code class="multiline">brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git
+brew install atomdrift/tap/scan</code>
+                <button class="copy-button" type="button" data-copy="brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git&#10;brew install atomdrift/tap/scan" aria-label="Copy Homebrew install commands">copy</button>
+              </div>
+            </div>
+          </div>
+          <div class="support">
+            <p class="support-title">Supported operating systems</p>
+            <ul class="os-list"><li>macOS</li><li>Linux</li></ul>
+          </div>
+        </article>
       </div>
     </section>
 
     <section id="downloads" aria-labelledby="downloads-title">
       <div class="section-head">
-        <h2 id="downloads-title">Prefer to steer?</h2>
-        <p>Package managers and manual downloads are welcome too.</p>
+        <h2 id="downloads-title">Manual installation</h2>
+        <p>Install a specific release without executing an installer script.</p>
       </div>
       <div class="alternatives">
         <article class="alternative">
-          <h3><span aria-hidden="true">🍺</span> Homebrew</h3>
-          <p>For macOS or Linux. Homebrew owns the install location and future upgrades.</p>
-          <div class="mini-command">
-            <code>brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git
-brew install atomdrift/tap/scan</code>
-            <button class="copy-button" type="button" data-copy="brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git&#10;brew install atomdrift/tap/scan" aria-label="Copy Homebrew install commands">copy</button>
-          </div>
-        </article>
-        <article class="alternative">
-          <h3><span aria-hidden="true">📦</span> Manual download</h3>
-          <p>Choose your target archive from GitHub Releases, then compare it with the release’s <code>SHA256SUMS</code> before installing.</p>
+          <h3>GitHub release artifacts</h3>
+          <p>Release archives are named by Rust target triple and contain the platform executable.</p>
+          <ol class="manual-steps">
+            <li>Download the archive for the required operating system and architecture.</li>
+            <li>Verify the archive against the release’s <code>SHA256SUMS</code>.</li>
+            <li>Extract <code>atomscan</code> or <code>atomscan.exe</code> into a directory on PATH.</li>
+            <li>Run <code>atomscan --version</code> before use.</li>
+          </ol>
           <a class="text-link" href="https://github.com/atomdrift-project/scan/releases/latest">Open the latest Scan release →</a>
         </article>
       </div>
     </section>
 
-    <section id="support" aria-labelledby="support-title">
+    <section id="behavior" aria-labelledby="behavior-title">
       <div class="section-head">
-        <h2 id="support-title">The test fleet</h2>
-        <p>Actual installer behavior, not merely shell syntax.</p>
+        <h2 id="behavior-title">Installer behavior</h2>
+        <p>Relevant details for review and deployment.</p>
       </div>
-      <div class="matrix">
-        <div class="matrix-group"><h3>🐧 Linux</h3><p>Fedora / Silverblue userspace, Debian, Ubuntu, openSUSE, Alpine, Wolfi, and openEuler.</p></div>
-        <div class="matrix-group"><h3>😈 BSD</h3><p>FreeBSD, OpenBSD, NetBSD, DragonFly BSD, and GhostBSD.</p></div>
-        <div class="matrix-group"><h3>🛰 Other Unix</h3><p>macOS, Haiku, GNU/Hurd, Solaris, OmniOS, OpenIndiana, and Tribblix.</p></div>
-        <div class="matrix-group"><h3>🪟 Windows</h3><p>Windows Server 2022 CI with Windows PowerShell 5.1 compatibility.</p></div>
-      </div>
-      <p class="fine-print">Release binaries cover x86-64, Apple Silicon, Linux ARM64, s390x, RISC-V 64, and Linux PowerPC 64 LE where published. On an otherwise supported Unix without a matching archive, the automatic installer can build from source. Review the <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">shell installer</a> or <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">PowerShell installer</a> before running it.</p>
+      <dl class="behavior-grid">
+        <div class="behavior-item"><dt>Artifact selection</dt><dd>Maps the operating system, CPU architecture, and Linux libc to a published Rust target triple. A version can be pinned explicitly.</dd></div>
+        <div class="behavior-item"><dt>Integrity</dt><dd>Requires a matching SHA-256 entry from the release’s <code>SHA256SUMS</code>. GitHub attestations are verified when <code>gh</code> is available.</dd></div>
+        <div class="behavior-item"><dt>Pre-install check</dt><dd>Executes the downloaded binary with <code>--version</code> before replacing an existing installation.</dd></div>
+        <div class="behavior-item"><dt>Destination</dt><dd>Prefers a writable user directory already on PATH, then an OS-appropriate system PATH directory.</dd></div>
+        <div class="behavior-item"><dt>Privilege</dt><dd>The shell installer escalates only when required, trying <code>doas</code>, <code>pfexec</code>, then <code>sudo</code>. PowerShell installs per-user.</dd></div>
+        <div class="behavior-item"><dt>Replacement and fallback</dt><dd>Replaces the executable atomically. Automatic mode builds from source when no matching binary is published.</dd></div>
+      </dl>
+      <p class="fine-print">Release binaries cover x86-64, Apple Silicon, Linux ARM64, s390x, RISC-V 64, and Linux PowerPC 64 LE where published. Review the <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">shell installer</a> or <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">PowerShell installer</a> before execution.</p>
     </section>
   </main>
 
@@ -437,13 +472,6 @@ brew install atomdrift/tap/scan</code>
 
   <script>
     (function () {
-      var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent;
-      var windows = /win/i.test(platform);
-      var card = document.querySelector('[data-installer="' + (windows ? 'windows' : 'unix') + '"]');
-      var message = document.getElementById('recommendation');
-      if (card) card.classList.add('recommended');
-      if (message) message.textContent = windows ? 'PowerShell looks right for this machine.' : 'The POSIX shell installer looks right for this machine.';
-
       document.querySelectorAll('[data-copy]').forEach(function (button) {
         button.addEventListener('click', function () {
           var command = button.getAttribute('data-copy');
