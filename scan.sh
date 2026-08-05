@@ -9,8 +9,8 @@
 #
 # What it does, in order: work out the platform, pick an install method, fetch a
 # release binary (checksum- and provenance-verified), fall back to a source
-# build when no binary exists for the platform, then report on the optional
-# analysis tools that make scans deeper.
+# build when no binary exists for the platform, then install the optional
+# analysis tools that are available from the machine's configured repositories.
 #
 # Re-running is safe and cheap: an install that is already current is left
 # alone, and everything written to the install directory is written atomically.
@@ -66,8 +66,11 @@ VERSION=""      # version being installed, without the leading v
 INSTALL_DIR=""  # directory the binary lands in
 INSTALLED=""    # full path of the binary we installed
 CHANGED=0       # whether this run actually replaced anything
+ALREADY_CURRENT=0 # target version was already installed at the chosen path
 INSTALL_ESCALATOR="" # doas | pfexec | sudo, when INSTALL_DIR needs privilege
 INSTALL_PRIVILEGED=0 # whether writes to INSTALL_DIR need that escalator
+PRIVILEGE_APPROVED=0 # user approved the selected escalator for this run
+PRIVILEGE_DENIED=0   # do not ask repeatedly after a declined/noninteractive prompt
 BREW_PREFIX=""  # Homebrew root, empty when there is no Homebrew
 DOWNLOADER=""   # curl | wget | fetch | ftp
 WGET_MODERN=0   # GNU wget (spider, header dumps) rather than busybox wget
@@ -90,14 +93,15 @@ Options:
   --dir DIR           Install into DIR (default: a suitable directory on PATH).
   --method METHOD     auto, binary, brew, or source. auto prefers Homebrew on
                       macOS and Linux, then a release binary, then source.
-  --no-tools          Skip the optional analysis tool check (rizin, upx, ...).
+  --no-tools          Skip optional analysis tool installation (rizin, upx, ...).
   --force             Reinstall even when the target version is already there.
   --quiet             Only report problems.
   --help              Show this message.
 
 Environment:
   ATOMSCAN_VERSION, ATOMSCAN_INSTALL_DIR, ATOMSCAN_METHOD, ATOMSCAN_NO_TOOLS
-  SCAN_THEME          dark (default) or light, matching the scanner.
+  SCAN_THEME          dark (default) or light.
+  SCAN_ASCII          Force ASCII glyphs instead of the branded Unicode UI.
   NO_COLOR            Disable colour (any value).
 
 To uninstall: delete the binary whose path this prints, or run
@@ -150,17 +154,19 @@ setup_style() {
 	[ -t 1 ] && TTY=1
 
 	if [ "${NO_COLOR+x}" = x ] || [ "$TTY" = 0 ] || [ "${TERM:-dumb}" = dumb ]; then
-		C_RED='' C_AMBER='' C_GREEN=''
+		C_RED='' C_AMBER='' C_GREEN='' C_BRAND=''
 		C_DIM='' C_BOLD='' C_RESET=''
 	else
 		case "${SCAN_THEME:-dark}" in
 		light | white)
-			C_RED="${ESC}[38;2;200;30;30m" C_AMBER="${ESC}[38;2;180;120;0m"
-			C_GREEN="${ESC}[38;2;30;140;30m" C_DIM="${ESC}[38;2;120;120;120m"
+			C_RED="${ESC}[38;2;220;38;38m" C_AMBER="${ESC}[38;2;217;119;6m"
+			C_GREEN="${ESC}[38;2;74;107;15m" C_BRAND="${ESC}[38;2;37;99;235m"
+			C_DIM="${ESC}[38;2;107;114;128m"
 			;;
 		*)
-			C_RED="${ESC}[38;2;255;70;70m" C_AMBER="${ESC}[38;2;255;175;55m"
-			C_GREEN="${ESC}[38;2;80;200;80m" C_DIM="${ESC}[38;2;100;100;100m"
+			C_RED="${ESC}[38;2;248;113;113m" C_AMBER="${ESC}[38;2;251;191;36m"
+			C_GREEN="${ESC}[38;2;208;255;0m" C_BRAND="${ESC}[38;2;96;165;250m"
+			C_DIM="${ESC}[38;2;161;161;170m"
 			;;
 		esac
 		C_BOLD="${ESC}[1m" C_RESET="${ESC}[0m"
@@ -168,12 +174,15 @@ setup_style() {
 
 	# Friendly glyphs in UTF-8 locales, with an ASCII fallback for old consoles
 	# and minimal environments.
-	case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
-	*[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) UTF8=1 ;;
-	*) UTF8=0 ;;
-	esac
+	UTF8=0
+	if [ -z "${SCAN_ASCII:-}" ] && [ "${TERM:-dumb}" != dumb ]; then
+		case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+		*[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) UTF8=1 ;;
+		*) [ "$TTY" = 1 ] && UTF8=1 ;;
+		esac
+	fi
 	if [ "$UTF8" = 1 ]; then
-		G_SCAN="🔍" G_STEP="·" G_OK="✓" G_WARN="⚠" G_ERR="✗"
+		G_SCAN="⚛️" G_STEP="·" G_OK="✓" G_WARN="⚠" G_ERR="✗"
 	else
 		G_SCAN="*" G_STEP="-" G_OK="+" G_WARN="!" G_ERR="x"
 	fi
@@ -182,7 +191,7 @@ setup_style() {
 # step LABEL VALUE — one aligned line of progress.
 step() {
 	if [ "$OPT_QUIET" = 0 ]; then
-		printf ' %s%s%s %s%-11s%s%s\n' "$C_DIM" "$G_STEP" "$C_RESET" "$C_DIM" "$1" "$C_RESET" "$2"
+		printf ' %s%s%s %s%-11s%s%s\n' "$C_BRAND" "$G_STEP" "$C_RESET" "$C_DIM" "$1" "$C_RESET" "$2"
 	fi
 }
 
@@ -212,7 +221,7 @@ banner() {
 		return 0
 	fi
 	printf '\n %s%s%s %sInstalling Atomdrift Scan%s\n\n' \
-		"$C_DIM" "$G_SCAN" "$C_RESET" "$C_BOLD" "$C_RESET"
+		"$C_BRAND" "$G_SCAN" "$C_RESET" "$C_BOLD" "$C_RESET"
 }
 
 # ---------------------------------------------------------------------------
@@ -524,12 +533,47 @@ find_escalator() {
 	return 1
 }
 
-# use_install_dir DIR REASON [ALLOW_PRIVILEGE] — use DIR directly when possible,
-# otherwise optionally try each privilege mechanism in preference order. Trying
-# the next tool after a policy or authentication failure matters on systems
-# that ship more than one of doas, pfexec, and sudo.
+quote_arg() {
+	qa_escaped=$(printf '%s' "$1" | sed "s/'/'\\\\''/g")
+	printf "'%s'" "$qa_escaped"
+}
+
+# Ask through the controlling terminal because stdin contains scan.sh when the
+# documented `curl | sh` form is used. Approval is remembered for this run;
+# every later privileged operation is still printed before it executes.
+approve_privilege() {
+	ap_command=$1
+	if [ "$PRIVILEGE_APPROVED" = 1 ]; then
+		step privilege "$ap_command"
+		return 0
+	fi
+	[ "$PRIVILEGE_DENIED" = 0 ] || return 1
+	if ! (: </dev/tty) 2>/dev/null; then
+		warn "privilege is required, but no interactive terminal is available"
+		note "command not run:  $ap_command"
+		PRIVILEGE_DENIED=1
+		return 1
+	fi
+	printf '\n %s%s%s %sPermission needed%s\n   %s\n   Allow %s for this install? [y/N] ' \
+		"$C_AMBER" "$G_WARN" "$C_RESET" "$C_BOLD" "$C_RESET" "$ap_command" "$INSTALL_ESCALATOR" >/dev/tty
+	IFS= read -r ap_answer </dev/tty || ap_answer=""
+	case $ap_answer in
+	[yY] | [yY][eE][sS])
+		PRIVILEGE_APPROVED=1
+		return 0
+		;;
+	*)
+		PRIVILEGE_DENIED=1
+		warn "permission declined — no privileged changes were made"
+		return 1
+		;;
+	esac
+}
+
+# use_install_dir DIR [ALLOW_PRIVILEGE] — use DIR directly when possible,
+# otherwise optionally request permission for the preferred privilege tool.
 use_install_dir() {
-	uid_dir=$1 uid_reason=$2 uid_privilege=${3:-1}
+	uid_dir=$1 uid_privilege=${2:-1}
 	if mkdir -p "$uid_dir" 2>/dev/null && writable_dir "$uid_dir"; then
 		INSTALL_DIR=$uid_dir
 		INSTALL_PRIVILEGED=0
@@ -539,18 +583,24 @@ use_install_dir() {
 
 	[ "$uid_privilege" = 1 ] || return 1
 	[ "$(id -u)" = 0 ] && return 1
-	for uid_cmd in doas pfexec sudo; do
-		command -v "$uid_cmd" >/dev/null 2>&1 || continue
-		step privilege "$uid_cmd  ${C_DIM}($uid_reason)${C_RESET}"
-		if "$uid_cmd" mkdir -p "$uid_dir"; then
-			[ -d "$uid_dir" ] || continue
-			INSTALL_DIR=$uid_dir
-			INSTALL_ESCALATOR=$uid_cmd
-			INSTALL_PRIVILEGED=1
-			return 0
-		fi
-		warn "$uid_cmd could not prepare $uid_dir — trying another option"
-	done
+	find_escalator || return 1
+	uid_cmd=$INSTALL_ESCALATOR
+	# Selecting an existing protected directory is read-only. Defer the prompt
+	# until install_binary_file has a file to write; an already-current rerun
+	# will then finish without asking for unused privilege.
+	if [ -d "$uid_dir" ]; then
+		INSTALL_DIR=$uid_dir
+		INSTALL_PRIVILEGED=1
+		return 0
+	fi
+	uid_display="$uid_cmd mkdir -p $(quote_arg "$uid_dir")"
+	approve_privilege "$uid_display" || return 1
+	if "$uid_cmd" mkdir -p "$uid_dir" && [ -d "$uid_dir" ]; then
+		INSTALL_DIR=$uid_dir
+		INSTALL_PRIVILEGED=1
+		return 0
+	fi
+	warn "$uid_cmd could not prepare $uid_dir"
 	return 1
 }
 
@@ -573,25 +623,26 @@ managed_path_dir() {
 native_path_dirs() {
 	case $1 in
 	Haiku) printf '%s\n' '/boot/system/non-packaged/bin /usr/local/bin' ;;
-	SunOS) printf '%s\n' '/opt/local/bin /usr/local/bin' ;;
+	SunOS) printf '%s\n' '/opt/atomdrift/bin' ;;
 	Darwin) printf '%s\n' '/usr/local/bin /opt/local/bin' ;;
-	NetBSD) printf '%s\n' '/usr/local/bin /usr/pkg/bin' ;;
+	NetBSD) printf '%s\n' '/usr/pkg/bin /usr/local/bin' ;;
 	*) printf '%s\n' '/usr/local/bin' ;;
 	esac
 	return 0
 }
 
 # Try OS-conventional local directories before following raw PATH order. Every
-# candidate must already be on PATH: the command should work in the next shell
-# without asking the user to edit their profile.
+# REQUIRE_PATH defaults to 1. Non-Linux systems can deliberately select their
+# native application prefix even when the user still needs PATH advice.
 use_native_path_dir() {
 	unpd_privilege=${1:-1}
+	unpd_require_path=${2:-1}
 	unpd_os=$(uname -s 2>/dev/null || echo unknown)
 	unpd_dirs=$(native_path_dirs "$unpd_os")
 	for unpd_dir in $unpd_dirs; do
-		on_path "$unpd_dir" || continue
+		if [ "$unpd_require_path" = 1 ]; then on_path "$unpd_dir" || continue; fi
 		managed_path_dir "$unpd_dir" && continue
-		if use_install_dir "$unpd_dir" "$unpd_os PATH" "$unpd_privilege"; then
+		if use_install_dir "$unpd_dir" "$unpd_privilege"; then
 			return 0
 		fi
 	done
@@ -613,7 +664,7 @@ use_any_path_dir() {
 		case $uap_dir in
 		/*)
 			managed_path_dir "$uap_dir" || {
-				if use_install_dir "$uap_dir" "PATH fallback" "$uap_privilege"; then
+				if use_install_dir "$uap_dir" "$uap_privilege"; then
 					return 0
 				fi
 			}
@@ -639,8 +690,9 @@ installed_version() {
 resolve_install_dir() {
 	INSTALL_PRIVILEGED=0
 	INSTALL_ESCALATOR=""
+	rid_os=$(uname -s 2>/dev/null || echo unknown)
 	if [ -n "$OPT_DIR" ]; then
-		if use_install_dir "$OPT_DIR" "explicit --dir"; then
+		if use_install_dir "$OPT_DIR"; then
 			return 0
 		fi
 		die "$OPT_DIR is not writable and no privilege tool could prepare it
@@ -653,10 +705,17 @@ resolve_install_dir() {
 	if [ -n "$rid_cur" ]; then
 		rid_dir=$(dirname "$rid_cur")
 		rid_brewed=0
+		rid_system_core=0
 		if [ -n "$BREW_PREFIX" ] && [ "${rid_dir#"$BREW_PREFIX"}" != "$rid_dir" ]; then
 			rid_brewed=1
 		fi
-		if [ "$rid_brewed" = 0 ] && writable_dir "$rid_dir"; then
+		# Linux distributions may legitimately own /usr/bin installs. On the
+		# other Unix families, migrate toward the native local/application prefix
+		# instead of perpetuating an old system-directory choice.
+		if [ "$rid_os" != Linux ]; then
+			case $rid_dir in /bin | /sbin | /usr/bin | /usr/sbin) rid_system_core=1 ;; esac
+		fi
+		if [ "$rid_brewed" = 0 ] && [ "$rid_system_core" = 0 ] && writable_dir "$rid_dir"; then
 			INSTALL_DIR=$rid_dir
 			return 0
 		fi
@@ -683,15 +742,18 @@ resolve_install_dir() {
 		done
 	fi
 
-	# Search all PATH entries without privilege before considering elevation. A
-	# writable custom user bin directory must beat even a conventional /usr/bin.
-	use_native_path_dir 0 && return 0
-	use_any_path_dir 0 && return 0
-
-	# Nothing writable was available. Prefer the OS's conventional local prefix,
-	# then honor PATH order as the final (possibly privileged) fallback.
-	use_native_path_dir 1 && return 0
-	use_any_path_dir 1 && return 0
+	# Linux honors PATH throughout. Elsewhere, prefer the native application
+	# prefix even when it needs PATH advice; never fall through to /usr/bin.
+	if [ "$rid_os" = Linux ]; then
+		use_native_path_dir 0 1 && return 0
+		use_any_path_dir 0 && return 0
+		use_native_path_dir 1 1 && return 0
+		use_any_path_dir 1 && return 0
+	else
+		use_native_path_dir 0 0 && return 0
+		use_any_path_dir 0 && return 0
+		use_native_path_dir 1 0 && return 0
+	fi
 	die "no usable absolute directory was found on PATH
    Add \$HOME/.local/bin or \$HOME/bin to PATH, or choose one with --dir."
 }
@@ -704,8 +766,10 @@ resolve_install_dir() {
 install_binary_file() {
 	ibf_dest="$INSTALL_DIR/$BIN"
 	ibf_tmp="$INSTALL_DIR/.$BIN.new.$$"
-	INSTALL_TMP=$ibf_tmp
 	if [ "$INSTALL_PRIVILEGED" = 1 ]; then
+		ibf_display="$INSTALL_ESCALATOR cp $(quote_arg "$1") $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR chmod 755 $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR mv -f $(quote_arg "$ibf_tmp") $(quote_arg "$ibf_dest")"
+		approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
+		INSTALL_TMP=$ibf_tmp
 		"$INSTALL_ESCALATOR" cp "$1" "$ibf_tmp" || {
 			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
 			die "cannot write to $INSTALL_DIR with $INSTALL_ESCALATOR"
@@ -719,6 +783,7 @@ install_binary_file() {
 			die "cannot replace $ibf_dest with $INSTALL_ESCALATOR"
 		}
 	else
+		INSTALL_TMP=$ibf_tmp
 		cp "$1" "$ibf_tmp" || {
 			rm -f "$ibf_tmp" 2>/dev/null || :
 			die "cannot write to $INSTALL_DIR"
@@ -788,7 +853,7 @@ install_brew() {
 		if [ -z "$(brew outdated --formula --quiet "$TAP/scan" 2>/dev/null)" ]; then
 			INSTALLED="$br_prefix/bin/$BIN"
 			VERSION=$(installed_version "$INSTALLED" || :)
-			ok "up to date" "$INSTALLED  ${C_DIM}${VERSION}${C_RESET}"
+			ALREADY_CURRENT=1
 			return 0
 		fi
 		note "upgrading through Homebrew — it builds from source, so this takes a while"
@@ -832,20 +897,24 @@ install_binary() {
 	fi
 	step version "$VERSION${OPT_VERSION:+  ${C_DIM}(pinned)${C_RESET}}"
 
-	# Idempotence: an install that is already what we would install is done.
-	ib_have=$(installed_version "$INSTALL_DIR/$BIN" || :)
-	if [ "$OPT_FORCE" = 0 ] && [ "$ib_have" = "$VERSION" ]; then
-		INSTALLED="$INSTALL_DIR/$BIN"
-		ok "up to date" "$INSTALLED  ${C_DIM}$VERSION${C_RESET}"
-		return 0
-	fi
-
 	ib_name="$BIN-$VERSION-$TARGET.tar.gz"
 	ib_base="https://github.com/$REPO/releases/download/v$VERSION"
 
 	if ! http_ok "$ib_base/$ib_name"; then
 		warn "release v$VERSION publishes no binary for $TARGET"
 		return 1
+	fi
+
+	# Do not prepare or elevate into a destination until the release asset this
+	# path intends to install is known to exist.
+	[ -n "$INSTALL_DIR" ] || resolve_install_dir
+
+	# Idempotence: an install that is already what we would install is done.
+	ib_have=$(installed_version "$INSTALL_DIR/$BIN" || :)
+	if [ "$OPT_FORCE" = 0 ] && [ "$ib_have" = "$VERSION" ]; then
+		INSTALLED="$INSTALL_DIR/$BIN"
+		ALREADY_CURRENT=1
+		return 0
 	fi
 
 	step method "release binary  ${C_DIM}$TARGET${C_RESET}"
@@ -968,10 +1037,13 @@ install_source() {
 	fi
 	VERSION=${is_ref#v}
 
+	# Source prerequisites and the requested release are now known-good. Only at
+	# this point may destination preparation ask for privilege or change a prefix.
+	[ -n "$INSTALL_DIR" ] || resolve_install_dir
 	is_have=$(installed_version "$INSTALL_DIR/$BIN" || :)
 	if [ "$OPT_FORCE" = 0 ] && [ -n "$is_have" ] && [ "$is_have" = "$VERSION" ]; then
 		INSTALLED="$INSTALL_DIR/$BIN"
-		ok "up to date" "$INSTALLED  ${C_DIM}$VERSION${C_RESET}"
+		ALREADY_CURRENT=1
 		return 0
 	fi
 
@@ -1083,8 +1155,8 @@ install_source() {
 # Optional analysis tools
 #
 # None of these are required: scans work without them, with less depth on some
-# file types. Report the exact package-manager command, but leave installation
-# to the user rather than silently changing the machine from a piped installer.
+# file types. Install only packages advertised by the configured repositories;
+# failed queries and unknown package names are treated as unavailable.
 # ---------------------------------------------------------------------------
 
 have_tool() {
@@ -1100,6 +1172,7 @@ detect_pkg_manager() {
 		PM=brew PM_INSTALL="brew install"
 		return 0
 	fi
+	pm_os=$(uname -s 2>/dev/null || echo unknown)
 	for pm_c in apt-get dnf pacman zypper apk pkg pkgin pkg_add; do
 		command -v "$pm_c" >/dev/null 2>&1 || continue
 		case $pm_c in
@@ -1108,7 +1181,11 @@ detect_pkg_manager() {
 		pacman) PM=pacman PM_INSTALL="pacman -S --noconfirm --needed" ;;
 		zypper) PM=zypper PM_INSTALL="zypper --non-interactive install" ;;
 		apk) PM=apk PM_INSTALL="apk add" ;;
-		pkg) PM=pkg PM_INSTALL="pkg install -y" ;;
+		pkg)
+			# Solaris/illumos `pkg` is IPS, not FreeBSD pkg(8); its package
+			# names and flags are unrelated. Prefer pkgsrc's pkgin when present.
+			case $pm_os in FreeBSD | DragonFly) PM=pkg PM_INSTALL="pkg install -y" ;; *) continue ;; esac
+			;;
 		pkgin) PM=pkgin PM_INSTALL="pkgin -y install" ;;
 		pkg_add) PM=pkg_add PM_INSTALL="pkg_add" ;;
 		esac
@@ -1119,11 +1196,30 @@ detect_pkg_manager() {
 	return 0
 }
 
-# pkg_name TOOL — the package providing TOOL under the detected manager, empty
-# when this manager has no name we trust for it.
-pkg_name() {
+# True only when the configured repositories currently advertise PACKAGE.
+# A failed/offline query is conservative: do not suggest or attempt an install.
+package_available() {
+	pa_pkg=$1
+	case $PM in
+	brew) brew info --formula "$pa_pkg" >/dev/null 2>&1 ;;
+	apt) apt-cache show "$pa_pkg" >/dev/null 2>&1 ;;
+	dnf) dnf --quiet info "$pa_pkg" >/dev/null 2>&1 ;;
+	pacman) pacman -Si "$pa_pkg" >/dev/null 2>&1 ;;
+	zypper) zypper --non-interactive info "$pa_pkg" >/dev/null 2>&1 ;;
+	apk) apk search -e "$pa_pkg" 2>/dev/null | grep -q "^${pa_pkg}-[0-9]" ;;
+	pkg) pkg search -q -x "^${pa_pkg}-[0-9]" 2>/dev/null | grep -q . ;;
+	pkgin) pkgin -n search "^${pa_pkg}-[0-9]" 2>/dev/null | grep -q "^${pa_pkg}-" ;;
+	pkg_add) pkg_info -Q "$pa_pkg" 2>/dev/null | grep -q "^${pa_pkg}-" ;;
+	*) return 1 ;;
+	esac
+}
+
+# pkg_names TOOL — preferred packages that can provide TOOL under the detected
+# manager. The first one advertised by the active repositories wins.
+pkg_names() {
 	case "$PM:$1" in
-	brew:rizin | apt:rizin | dnf:rizin | pacman:rizin | pkg:rizin) printf rizin ;;
+	brew:rizin | apt:rizin | dnf:rizin | pacman:rizin | pkg:rizin) printf 'rizin radare2' ;;
+	zypper:rizin | apk:rizin | pkgin:rizin | pkg_add:rizin) printf radare2 ;;
 	brew:upx | dnf:upx | pacman:upx | zypper:upx | apk:upx | pkg:upx | pkgin:upx | pkg_add:upx) printf upx ;;
 	apt:upx) printf upx-ucl ;;
 	brew:7z) printf sevenzip ;;
@@ -1135,12 +1231,58 @@ pkg_name() {
 	esac
 }
 
+install_tool_packages() {
+	[ "$#" -gt 0 ] || return 0
+	itp_display="$PM_INSTALL $*"
+	case $PM in
+	brew)
+		step tools "$itp_display"
+		brew install "$@"
+		;;
+	*)
+		if [ "$(id -u)" = 0 ]; then
+			step tools "$itp_display"
+			case $PM in
+			apt) apt-get install -y "$@" ;;
+			dnf) dnf install -y "$@" ;;
+			pacman) pacman -S --noconfirm --needed "$@" ;;
+			zypper) zypper --non-interactive install "$@" ;;
+			apk) apk add "$@" ;;
+			pkg) pkg install -y "$@" ;;
+			pkgin) pkgin -y install "$@" ;;
+			pkg_add) pkg_add "$@" ;;
+			esac
+		else
+			[ -n "$INSTALL_ESCALATOR" ] || find_escalator || {
+				note "available tools not installed:  $itp_display"
+				return 1
+			}
+			itp_display="$INSTALL_ESCALATOR $itp_display"
+			approve_privilege "$itp_display" || {
+				note "tools skipped; run later:  $itp_display"
+				return 1
+			}
+			case $PM in
+			apt) "$INSTALL_ESCALATOR" apt-get install -y "$@" ;;
+			dnf) "$INSTALL_ESCALATOR" dnf install -y "$@" ;;
+			pacman) "$INSTALL_ESCALATOR" pacman -S --noconfirm --needed "$@" ;;
+			zypper) "$INSTALL_ESCALATOR" zypper --non-interactive install "$@" ;;
+			apk) "$INSTALL_ESCALATOR" apk add "$@" ;;
+			pkg) "$INSTALL_ESCALATOR" pkg install -y "$@" ;;
+			pkgin) "$INSTALL_ESCALATOR" pkgin -y install "$@" ;;
+			pkg_add) "$INSTALL_ESCALATOR" pkg_add "$@" ;;
+			esac
+		fi
+		;;
+	esac
+}
+
 check_tools() {
 	if [ "$OPT_TOOLS" = 0 ]; then
 		return 0
 	fi
 	detect_pkg_manager || :
-	ct_report="" ct_missing="" ct_cmds=""
+	ct_ready="" ct_unavailable="" ct_not_installed="" ct_packages="" ct_installing=""
 
 	# tool : binaries that provide it
 	for ct_spec in "rizin:rizin radare2 r2" "upx:upx" "7z:7zz 7z" "innoextract:innoextract"; do
@@ -1148,25 +1290,44 @@ check_tools() {
 		ct_bins=${ct_spec#*:}
 
 		if have_tool "$ct_bins"; then
-			ct_report="$ct_report $C_GREEN$G_OK$C_RESET$ct_tool"
+			ct_ready="$ct_ready $ct_tool"
 			continue
 		fi
 
-		ct_pkg=$(pkg_name "$ct_tool")
-		ct_missing="$ct_missing $ct_tool"
-		ct_report="$ct_report $C_DIM-$ct_tool$C_RESET"
-		[ -n "$ct_pkg" ] && ct_cmds="$ct_cmds $ct_pkg"
+		ct_pkg=""
+		ct_candidates=$(pkg_names "$ct_tool")
+		for ct_candidate in $ct_candidates; do
+			if package_available "$ct_candidate"; then
+				ct_pkg=$ct_candidate
+				break
+			fi
+		done
+		if [ -n "$ct_pkg" ]; then
+			ct_packages="$ct_packages $ct_pkg"
+			ct_installing="$ct_installing $ct_tool"
+		else
+			ct_unavailable="$ct_unavailable $ct_tool"
+		fi
 	done
 
-	step tools "${ct_report# }  ${C_DIM}optional${C_RESET}"
-	if [ -n "$ct_cmds" ]; then
-		ct_sudo=""
-		if [ "$PM" != brew ] && [ "$(id -u)" != 0 ]; then
-			ct_sudo="sudo "
+	if [ -n "$ct_packages" ]; then
+		# shellcheck disable=SC2086 # package names are installer-owned words.
+		if install_tool_packages $ct_packages; then
+			ct_ready="$ct_ready$ct_installing"
+		else
+			ct_not_installed="$ct_not_installed$ct_installing"
 		fi
-		note "for deeper analysis:  $ct_sudo$PM_INSTALL$ct_cmds"
-	elif [ -n "$ct_missing" ]; then
-		note "optional, not packaged here:$ct_missing"
+	fi
+	if [ -n "$ct_ready" ]; then
+		ok tools "${ct_ready# }  ${C_DIM}deeper analysis ready${C_RESET}"
+	else
+		step tools "core scanner ready"
+	fi
+	if [ -n "$ct_unavailable" ]; then
+		note "not available from configured repositories:${ct_unavailable}"
+	fi
+	if [ -n "$ct_not_installed" ]; then
+		note "available, but not installed:${ct_not_installed}"
 	fi
 }
 
@@ -1206,13 +1367,16 @@ summary() {
 		return 0
 	fi
 	sm_v=$(installed_version "$INSTALLED" || printf '%s' "${VERSION:-}")
-	printf '\n %s%s%s %s%s %s%s  %s%s%s\n\n' \
-		"$C_GREEN" "$G_OK" "$C_RESET" "$C_BOLD" "$BIN" "$sm_v" "$C_RESET" \
-		"$C_DIM" "$INSTALLED" "$C_RESET"
-	printf '   %sscan a project%s     %s ./project\n' "$C_DIM" "$C_RESET" "$BIN"
-	printf '   %sscan a package%s     %s purl npm/left-pad@1.3.0\n' "$C_DIM" "$C_RESET" "$BIN"
-	printf '   %severything else%s    %s --help\n' "$C_DIM" "$C_RESET" "$BIN"
-	printf '\n   %sThe first scan downloads the model, rule, and bloom-filter bundles.%s\n\n' \
+	sm_current=""
+	[ "$ALREADY_CURRENT" = 1 ] && sm_current="  ${C_DIM}· already current${C_RESET}"
+	printf '\n %s%s%s %sReady to scan%s  %s %s%s\n' \
+		"$C_GREEN" "$G_OK" "$C_RESET" "$C_BOLD" "$C_RESET" "$BIN" "$sm_v" "$sm_current"
+	printf '   %s%s%s\n\n' "$C_DIM" "$INSTALLED" "$C_RESET"
+	printf '   %sTry it%s\n' "$C_BRAND" "$C_RESET"
+	printf '   %sproject%s     %s ./project\n' "$C_DIM" "$C_RESET" "$BIN"
+	printf '   %spackage%s     %s purl npm/left-pad@1.3.0\n' "$C_DIM" "$C_RESET" "$BIN"
+	printf '   %sexplore%s     %s --help\n' "$C_DIM" "$C_RESET" "$BIN"
+	printf '\n   %sFirst scan fetches the model, rule, and bloom-filter bundles.%s\n\n' \
 		"$C_DIM" "$C_RESET"
 }
 
@@ -1267,18 +1431,25 @@ main() {
 	fi
 
 	if [ "$METHOD" = binary ]; then
-		resolve_install_dir
-		install_binary || {
+		if [ -z "$TARGET" ]; then
+			warn "no published binary for this platform"
 			if [ "$main_auto" = 1 ]; then
 				METHOD=source
 			else
 				die "the requested binary install could not be completed"
 			fi
-		}
+		else
+			install_binary || {
+				if [ "$main_auto" = 1 ]; then
+					METHOD=source
+				else
+					die "the requested binary install could not be completed"
+				fi
+			}
+		fi
 	fi
 
 	if [ "$METHOD" = source ]; then
-		[ -n "$INSTALL_DIR" ] || resolve_install_dir
 		install_source
 	fi
 

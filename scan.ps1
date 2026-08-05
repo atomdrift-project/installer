@@ -11,8 +11,8 @@
 
     It works out the platform, fetches a release binary (checksum- and
     provenance-verified), falls back to a source build when no binary is
-    published for it, puts the install directory on PATH, and reports on the
-    optional analysis tools that make scans deeper.
+    published for it, puts the install directory on PATH, and installs the
+    optional analysis tools available from configured package sources.
 
     Re-running is safe and cheap: an install that is already current is left
     alone, and the binary is replaced atomically.
@@ -30,7 +30,7 @@
     Auto, Binary, or Source. Auto tries a release binary, then a source build.
 
 .PARAMETER NoTools
-    Skip the optional analysis tool check (rizin, upx, 7-Zip, innoextract).
+    Skip optional analysis tool installation (rizin, upx, 7-Zip, innoextract).
 
 .PARAMETER NoPath
     Do not add the install directory to the user PATH.
@@ -95,14 +95,15 @@ $script:Resolved = ''     # version being installed
 $script:InstallDir = ''
 $script:Installed = ''    # full path of the binary we installed
 $script:Changed = $false  # whether this run replaced anything
+$script:AlreadyCurrent = $false
 $script:Temp = ''
 
 # ---------------------------------------------------------------------------
 # Style
 #
-# ANSI when the host can render it, plain text otherwise. Colors match Scan's
-# litmus palette: green for success, amber for attention, red for failure, and
-# neutral grey for ordinary progress.
+# ANSI when the host can render it, plain text otherwise. Colors follow the
+# Atomdrift website: blue for motion, toxic lime for success, amber for
+# attention, red for failure, and a readable neutral for supporting detail.
 # ---------------------------------------------------------------------------
 
 function Initialize-Style {
@@ -120,20 +121,22 @@ function Initialize-Style {
 	$e = [char]27
 	if ($ansi) {
 		if ($env:SCAN_THEME -in @('light', 'white')) {
-			$script:CRed = "$e[38;2;200;30;30m"
-			$script:CAmber = "$e[38;2;180;120;0m"
-			$script:CGreen = "$e[38;2;30;140;30m"
-			$script:CDim = "$e[38;2;120;120;120m"
+			$script:CRed = "$e[38;2;220;38;38m"
+			$script:CAmber = "$e[38;2;217;119;6m"
+			$script:CGreen = "$e[38;2;74;107;15m"
+			$script:CBrand = "$e[38;2;37;99;235m"
+			$script:CDim = "$e[38;2;107;114;128m"
 		} else {
-			$script:CRed = "$e[38;2;255;70;70m"
-			$script:CAmber = "$e[38;2;255;175;55m"
-			$script:CGreen = "$e[38;2;80;200;80m"
-			$script:CDim = "$e[38;2;100;100;100m"
+			$script:CRed = "$e[38;2;248;113;113m"
+			$script:CAmber = "$e[38;2;251;191;36m"
+			$script:CGreen = "$e[38;2;208;255;0m"
+			$script:CBrand = "$e[38;2;96;165;250m"
+			$script:CDim = "$e[38;2;161;161;170m"
 		}
 		$script:CBold = "$e[1m"
 		$script:CReset = "$e[0m"
 	} else {
-		$script:CRed = '' ; $script:CAmber = '' ; $script:CGreen = ''
+		$script:CRed = '' ; $script:CAmber = '' ; $script:CGreen = '' ; $script:CBrand = ''
 		$script:CDim = '' ; $script:CBold = '' ; $script:CReset = ''
 	}
 
@@ -147,7 +150,7 @@ function Initialize-Style {
 		$script:Utf8 = $false
 	}
 	if ($script:Utf8) {
-		$script:GScan = [char]::ConvertFromUtf32(0x1F50D)
+		$script:GScan = ([string][char]0x269B) + [char]0xFE0F
 		$script:GStep = [string][char]0x00B7 ; $script:GOk = [string][char]0x2713
 		$script:GWarn = [string][char]0x26A0 ; $script:GErr = [string][char]0x2717
 	} else {
@@ -159,7 +162,7 @@ function Initialize-Style {
 
 function Write-Step([string]$Label, [string]$Value) {
 	if ($Quiet) { return }
-	Write-Host (" {0}{1}{2} {3}{4}{5}{6}" -f $script:CDim, $script:GStep, $script:CReset,
+	Write-Host (" {0}{1}{2} {3}{4}{5}{6}" -f $script:CBrand, $script:GStep, $script:CReset,
 		$script:CDim, $Label.PadRight(11), $script:CReset, $Value)
 }
 
@@ -190,7 +193,7 @@ function Write-Banner {
 	if ($Quiet) { return }
 	Write-Host ''
 	Write-Host (" {0}{1}{2} {3}Installing Atomdrift Scan{4}" -f
-		$script:CDim, $script:GScan, $script:CReset, $script:CBold, $script:CReset)
+		$script:CBrand, $script:GScan, $script:CReset, $script:CBold, $script:CReset)
 	Write-Host ''
 }
 
@@ -460,7 +463,7 @@ function Install-FromRelease {
 	$dest = Join-Path $script:InstallDir $ExeName
 	if (-not $Force -and (Get-InstalledVersion $dest) -eq $script:Resolved) {
 		$script:Installed = $dest
-		Write-Ok 'up to date' "$dest  $($script:CDim)$($script:Resolved)$($script:CReset)"
+		$script:AlreadyCurrent = $true
 		return $true
 	}
 
@@ -566,7 +569,7 @@ function Install-FromSource {
 	$have = Get-InstalledVersion $dest
 	if (-not $Force -and $have -and $have -eq $script:Resolved) {
 		$script:Installed = $dest
-		Write-Ok 'up to date' "$dest  $($script:CDim)$($script:Resolved)$($script:CReset)"
+		$script:AlreadyCurrent = $true
 		return
 	}
 
@@ -663,8 +666,8 @@ function Install-FromSource {
 # Optional analysis tools
 #
 # None of these are required: scans work without them, with less depth on some
-# file types. Report exact package-manager commands, but leave installation to
-# the user rather than silently changing the machine from a piped installer.
+# file types. Install only packages advertised by Scoop or winget's configured
+# sources; unavailable tools remain an honest, quiet note.
 # ---------------------------------------------------------------------------
 
 function Test-Tool([string[]]$Names) {
@@ -672,6 +675,24 @@ function Test-Tool([string[]]$Names) {
 		if (Get-Command $n -ErrorAction SilentlyContinue) { return $true }
 	}
 	return $false
+}
+
+function Test-ScoopPackage([string]$Name) {
+	try {
+		& scoop info $Name *> $null
+		return $?
+	} catch {
+		return $false
+	}
+}
+
+function Test-WingetPackage([string]$Id) {
+	try {
+		& winget show --id $Id --exact --accept-source-agreements *> $null
+		return $?
+	} catch {
+		return $false
+	}
 }
 
 function Show-OptionalTools {
@@ -688,26 +709,58 @@ function Show-OptionalTools {
 		@{ Name = 'innoextract'; Cmds = @('innoextract'); Scoop = 'innoextract'; Winget = '' }
 	)
 
-	$report = @()
-	$pending = @()
+	$ready = @()
+	$unavailable = @()
+	$notInstalled = @()
+	$scoopPackages = @()
+	$scoopTools = @()
+	$wingetPackages = @()
 	foreach ($tool in $tools) {
 		if (Test-Tool $tool.Cmds) {
-			$report += "$($script:CGreen)$($script:GOk)$($script:CReset)$($tool.Name)"
+			$ready += $tool.Name
 			continue
 		}
 
-		$report += "$($script:CDim)-$($tool.Name)$($script:CReset)"
-		if ($scoop -and $tool.Scoop) {
-			$pending += "scoop install $($tool.Scoop)"
-		} elseif ($winget -and $tool.Winget) {
-			$pending += "winget install --id $($tool.Winget)"
-		} elseif ($tool.Name -eq 'rizin') {
-			$pending += 'https://rizin.re/download/'
+		if ($scoop -and $tool.Scoop -and (Test-ScoopPackage $tool.Scoop)) {
+			$scoopPackages += $tool.Scoop
+			$scoopTools += $tool.Name
+		} elseif ($winget -and $tool.Winget -and (Test-WingetPackage $tool.Winget)) {
+			$wingetPackages += $tool
+		} else {
+			$unavailable += $tool.Name
 		}
 	}
 
-	Write-Step 'tools' (($report -join ' ') + "  $($script:CDim)optional$($script:CReset)")
-	foreach ($cmd in $pending) { Write-Note "for deeper analysis:  $cmd" }
+	if ($scoopPackages.Count) {
+		Write-Step 'tools' "scoop install $($scoopPackages -join ' ')"
+		$scoopInstalled = $false
+		try {
+			& scoop install @scoopPackages
+			$scoopInstalled = $?
+		} catch {
+			$scoopInstalled = $false
+		}
+		if ($scoopInstalled) { $ready += $scoopTools } else { $notInstalled += $scoopTools }
+	}
+	foreach ($tool in $wingetPackages) {
+		Write-Step 'tools' "winget install --id $($tool.Winget) --exact"
+		$wingetInstalled = $false
+		try {
+			& winget install --id $($tool.Winget) --exact --accept-package-agreements --accept-source-agreements
+			$wingetInstalled = $?
+		} catch {
+			$wingetInstalled = $false
+		}
+		if ($wingetInstalled) { $ready += $tool.Name } else { $notInstalled += $tool.Name }
+	}
+
+	if ($ready.Count) {
+		Write-Ok 'tools' "$($ready -join ' ')  $($script:CDim)deeper analysis ready$($script:CReset)"
+	} else {
+		Write-Step 'tools' 'core scanner ready'
+	}
+	if ($unavailable.Count) { Write-Note "not available from configured repositories: $($unavailable -join ' ')" }
+	if ($notInstalled.Count) { Write-Note "available, but not installed: $($notInstalled -join ' ')" }
 }
 
 # ---------------------------------------------------------------------------
@@ -736,16 +789,19 @@ function Write-Summary {
 	if ($Quiet) { return }
 	$version = Get-InstalledVersion $script:Installed
 	if (-not $version) { $version = $script:Resolved }
+	$current = ''
+	if ($script:AlreadyCurrent) { $current = "  $($script:CDim)$([char]0x00B7) already current$($script:CReset)" }
 	Write-Host ''
-	Write-Host (" {0}{1}{2} {3}{4} {5}{6}  {7}{8}{9}" -f
-		$script:CGreen, $script:GOk, $script:CReset, $script:CBold, $BinName, $version,
-		$script:CReset, $script:CDim, $script:Installed, $script:CReset)
+	Write-Host (" {0}{1}{2} {3}Ready to scan{4}  {5} {6}{7}" -f
+		$script:CGreen, $script:GOk, $script:CReset, $script:CBold, $script:CReset, $BinName, $version, $current)
+	Write-Host ("   {0}{1}{2}" -f $script:CDim, $script:Installed, $script:CReset)
 	Write-Host ''
-	Write-Host ("   {0}scan a project{1}     {2} .\project" -f $script:CDim, $script:CReset, $BinName)
-	Write-Host ("   {0}scan a package{1}     {2} purl npm/left-pad@1.3.0" -f $script:CDim, $script:CReset, $BinName)
-	Write-Host ("   {0}everything else{1}    {2} --help" -f $script:CDim, $script:CReset, $BinName)
+	Write-Host ("   {0}Try it{1}" -f $script:CBrand, $script:CReset)
+	Write-Host ("   {0}project{1}     {2} .\project" -f $script:CDim, $script:CReset, $BinName)
+	Write-Host ("   {0}package{1}     {2} purl npm/left-pad@1.3.0" -f $script:CDim, $script:CReset, $BinName)
+	Write-Host ("   {0}explore{1}     {2} --help" -f $script:CDim, $script:CReset, $BinName)
 	Write-Host ''
-	Write-Host ("   {0}The first scan downloads the model, rule, and bloom-filter bundles.{1}" -f
+	Write-Host ("   {0}First scan fetches the model, rule, and bloom-filter bundles.{1}" -f
 		$script:CDim, $script:CReset)
 	Write-Host ''
 }
@@ -753,6 +809,9 @@ function Write-Summary {
 # ---------------------------------------------------------------------------
 
 function Invoke-Install {
+	$script:Installed = ''
+	$script:Changed = $false
+	$script:AlreadyCurrent = $false
 	Initialize-Style
 	if ($Version -and $Version.TrimStart('v') -notmatch '^[0-9A-Za-z._+-]+$') {
 		Stop-Install "invalid version '$Version'"

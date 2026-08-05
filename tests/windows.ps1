@@ -14,6 +14,21 @@ if ($script:Target -ne $script:Self) {
 }
 Write-Host "ok - native platform -> $($script:Self)"
 
+# Available optional tools are installed in one idempotent package-manager
+# operation; missing repository entries are not guessed or recommended.
+$script:MockScoopArgs = @()
+function Test-Tool([string[]]$Names) { return $false }
+function Test-ScoopPackage([string]$Name) { return $Name -in @('upx', '7zip') }
+function Test-WingetPackage([string]$Id) { return $false }
+function scoop { $script:MockScoopArgs = @($args) }
+$NoTools = $false
+$Quiet = $true
+Show-OptionalTools
+if (($script:MockScoopArgs -join ' ') -ne 'install upx 7zip') {
+	throw "optional tool install was not repository-filtered: $($script:MockScoopArgs -join ' ')"
+}
+Write-Host 'ok - optional tools are limited to available packages'
+
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "atomscan-installer-test-$([guid]::NewGuid().ToString('N'))"
 $oldLocalAppData = $env:LOCALAPPDATA
 $script:InstallDir = Join-Path $root 'bin'
@@ -154,6 +169,10 @@ public static class FixtureTwo {
 	Remove-Item Function:\git -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\cargo -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\rustc -Force -ErrorAction SilentlyContinue
+	Remove-Item Function:\scoop -Force -ErrorAction SilentlyContinue
+	Remove-Item Function:\Test-Tool -Force -ErrorAction SilentlyContinue
+	Remove-Item Function:\Test-ScoopPackage -Force -ErrorAction SilentlyContinue
+	Remove-Item Function:\Test-WingetPackage -Force -ErrorAction SilentlyContinue
 	$env:LOCALAPPDATA = $oldLocalAppData
 	Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -101,9 +101,16 @@ INSTALL_DIR="$fixture_root/bin"
 export HOME XDG_CACHE_HOME
 
 source_dir="$XDG_CACHE_HOME/atomdrift/scan"
+destination_marker="$fixture_root/destination-prepared"
+resolve_install_dir() {
+	: >"$destination_marker"
+	INSTALL_DIR="$fixture_root/bin"
+}
 
-# Reject an old compiler before resolving a release or touching the cache.
+# Reject an old compiler before resolving a release, preparing a destination,
+# requesting privilege, or touching the cache.
 MOCK_RUST_VERSION=1.93.9
+INSTALL_DIR=""
 old_rust_log="$fixture_root/old-rust.log"
 if (install_source >"$old_rust_log" 2>&1); then
 	fail 'source install accepted Rust older than its MSRV'
@@ -114,7 +121,9 @@ case $old_rust_output in
 *) fail 'old-Rust error did not report the requirement and recovery action' ;;
 esac
 [ ! -e "$source_dir" ] || fail 'old Rust toolchain touched the source cache'
+[ ! -e "$destination_marker" ] || fail 'old Rust toolchain prepared an install destination'
 MOCK_RUST_VERSION=1.94.0
+INSTALL_DIR="$fixture_root/bin"
 
 # Even the initial clone is staged, so interruption leaves no poisoned cache.
 MOCK_CLONE_FAIL=1

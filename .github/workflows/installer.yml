@@ -80,6 +80,15 @@ jobs:
           bash --posix tests/source-cache.sh
           zsh --emulate sh tests/source-cache.sh
 
+      - name: Test optional tool discovery and installation
+        run: |
+          set -eu
+          sh tests/tools.sh
+          dash tests/tools.sh
+          ksh tests/tools.sh
+          bash --posix tests/tools.sh
+          zsh --emulate sh tests/tools.sh
+
   linux-distros:
     name: Linux / ${{ matrix.name }}
     runs-on: ubuntu-24.04
