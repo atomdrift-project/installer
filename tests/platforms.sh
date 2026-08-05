@@ -98,6 +98,8 @@ assert_platform 'macOS arm64' Darwin arm64 Darwin test 0 0 aarch64-apple-darwin
 assert_platform 'macOS x86_64' Darwin x86_64 Darwin test 0 0 x86_64-apple-darwin
 assert_platform 'macOS Rosetta' Darwin x86_64 Darwin test 1 0 aarch64-apple-darwin
 assert_platform 'FreeBSD' FreeBSD amd64 FreeBSD test 0 0 x86_64-unknown-freebsd
+[ "$PLATFORM" = "FreeBSD test  · x86_64" ] || fail "FreeBSD display repeats its target triple: $PLATFORM"
+printf 'ok - platform display is concise and human-readable\n'
 assert_platform 'OpenBSD' OpenBSD amd64 OpenBSD test 0 0 x86_64-unknown-openbsd
 assert_platform 'NetBSD' NetBSD amd64 NetBSD test 0 0 x86_64-unknown-netbsd
 assert_platform 'DragonFly BSD' DragonFly x86_64 DragonFly test 0 0 x86_64-unknown-dragonfly

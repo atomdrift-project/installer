@@ -61,3 +61,16 @@ install_binary_file "$fixture_one"
 install_binary_file "$fixture_two"
 [ "$(installed_version "$INSTALLED")" = 9.9.10 ] || fail 'atomic replacement failed'
 printf 'ok - native install and replacement\n'
+
+# Failure after staging must leave the installed binary intact and no hidden
+# partial file behind for later runs to trip over.
+if (
+	trap - 0
+	chmod() { return 1; }
+	install_binary_file "$fixture_one" 2>/dev/null
+); then
+	fail 'staging failure unexpectedly installed a binary'
+fi
+[ "$(installed_version "$INSTALLED")" = 9.9.10 ] || fail 'staging failure damaged the installed binary'
+[ ! -e "$INSTALL_DIR/.$BIN.new.$$" ] || fail 'staging failure left a partial binary'
+printf 'ok - failed binary staging rolls back cleanly\n'

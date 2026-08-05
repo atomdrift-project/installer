@@ -202,10 +202,10 @@ function Resolve-Platform {
 	$arch = $env:PROCESSOR_ARCHITECTURE
 	if ($env:PROCESSOR_ARCHITEW6432) { $arch = $env:PROCESSOR_ARCHITEW6432 }
 	switch ($arch) {
-		'AMD64' { $script:Self = 'x86_64-pc-windows-msvc' }
-		'ARM64' { $script:Self = 'aarch64-pc-windows-msvc' }
-		'x86' { $script:Self = 'i686-pc-windows-msvc' }
-		default { $script:Self = "$arch-pc-windows-msvc" }
+		'AMD64' { $script:Self = 'x86_64-pc-windows-msvc'; $displayArch = 'x86_64' }
+		'ARM64' { $script:Self = 'aarch64-pc-windows-msvc'; $displayArch = 'aarch64' }
+		'x86' { $script:Self = 'i686-pc-windows-msvc'; $displayArch = 'i686' }
+		default { $script:Self = "$arch-pc-windows-msvc"; $displayArch = $arch.ToLowerInvariant() }
 	}
 	$script:Target = ''
 	if ($Targets -contains $script:Self) { $script:Target = $script:Self }
@@ -216,7 +216,7 @@ function Resolve-Platform {
 	} catch {
 		try { $os = [System.Environment]::OSVersion.VersionString } catch { $os = 'Windows' }
 	}
-	Write-Step 'platform' ("{0}  {1}{2}{3}" -f $script:Self, $script:CDim, $os, $script:CReset)
+	Write-Step 'platform' ("{0}  {1}{2} {3}{4}" -f $os, $script:CDim, $script:GStep, $displayArch, $script:CReset)
 }
 
 # ---------------------------------------------------------------------------
@@ -413,8 +413,8 @@ function Install-Binary([string]$Source) {
 	$suffix = [guid]::NewGuid().ToString('N')
 	$new = "$dest.new.$suffix"
 	$old = "$dest.old.$suffix"
-	Copy-Item -LiteralPath $Source -Destination $new -Force
 	try {
+		Copy-Item -LiteralPath $Source -Destination $new -Force
 		if (Test-Path -LiteralPath $dest) {
 			[System.IO.File]::Replace($new, $dest, $old, $true)
 		} else {
@@ -520,7 +520,7 @@ function Install-FromRelease {
 # ---------------------------------------------------------------------------
 
 function Install-FromSource {
-	Write-Step 'method' "source build  $($script:CDim)git + cargo$($script:CReset)"
+	Write-Step 'method' "source  $($script:CDim)git + cargo$($script:CReset)"
 
 	if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 		Stop-Install "a source build needs git:`n   winget install --id Git.Git"
@@ -534,12 +534,16 @@ function Install-FromSource {
 		Write-Note 'winget install --id Microsoft.VisualStudio.2022.BuildTools'
 	}
 
-	$ref = 'main'
+	$ref = ''
 	if ($Version) {
 		$ref = "v$($Version.TrimStart('v'))"
+	} elseif ($script:Resolved) {
+		# Auto mode can arrive here after resolving a release that lacks a binary.
+		$ref = "v$($script:Resolved)"
 	} else {
 		$latest = Resolve-LatestVersion
-		if ($latest) { $ref = "v$latest" }
+		if (-not $latest) { Stop-Install 'could not work out the latest source release; re-run or specify -Version' }
+		$ref = "v$latest"
 	}
 	$script:Resolved = $ref.TrimStart('v')
 
@@ -552,20 +556,43 @@ function Install-FromSource {
 	}
 
 	$src = Join-Path $env:LOCALAPPDATA "atomdrift\scan-src"
-	if (Test-Path -LiteralPath (Join-Path $src '.git')) {
-		Write-Step 'source' "updating $src"
-		& git -C $src fetch --quiet --depth 1 origin $ref
-		if ($LASTEXITCODE -ne 0) { Stop-Install "cannot fetch $ref" }
-		& git -C $src checkout --quiet --force FETCH_HEAD
-		if ($LASTEXITCODE -ne 0) { Stop-Install "cannot check out $ref" }
-	} elseif (Test-Path -LiteralPath $src) {
+	$repoUrl = "https://github.com/$Repo.git"
+	$parent = Split-Path -Parent $src
+	New-Item -ItemType Directory -Force -Path $parent | Out-Null
+	$present = Test-Path -LiteralPath $src
+	$hasGit = Test-Path -LiteralPath (Join-Path $src '.git')
+	$repair = $false
+	if ($hasGit) {
+		$origin = & git -C $src remote get-url origin 2>$null
+		if ($LASTEXITCODE -ne 0 -or "$origin".Trim() -ne $repoUrl) {
+			Write-Warn 'cached source checkout has an unexpected origin - replacing it'
+			$repair = $true
+		} else {
+			Write-Step 'checkout' "updating $src"
+			& git -C $src fetch --quiet --depth 1 origin $ref
+			if ($LASTEXITCODE -ne 0) {
+				Write-Warn 'cached source checkout could not be fetched - replacing it'
+				$repair = $true
+			} else {
+				& git -C $src checkout --quiet --force FETCH_HEAD
+				if ($LASTEXITCODE -ne 0) {
+					Write-Warn 'cached source checkout could not be reset - replacing it'
+					$repair = $true
+				}
+			}
+		}
+	} elseif ($present) {
+		$repair = $true
+	}
+
+	if ($repair) {
 		# Clone beside an incomplete cache first. If cloning fails, the existing
 		# directory remains untouched; after success, replace it transactionally.
 		$suffix = [guid]::NewGuid().ToString('N')
 		$stage = "$src.clone.$suffix"
 		$old = "$src.old.$suffix"
-		Write-Step 'source' "repairing incomplete checkout at $src"
-		& git clone --quiet --depth 1 --branch $ref "https://github.com/$Repo.git" $stage
+		Write-Step 'checkout' "repairing $src"
+		& git clone --quiet --depth 1 --branch $ref $repoUrl $stage
 		if ($LASTEXITCODE -ne 0) {
 			Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
 			Stop-Install "cannot clone $Repo at $ref"
@@ -583,11 +610,22 @@ function Install-FromSource {
 			Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
 			Stop-Install "cannot replace incomplete checkout at $src"
 		}
-	} else {
-		Write-Step 'source' "cloning $ref into $src"
-		New-Item -ItemType Directory -Force -Path (Split-Path -Parent $src) | Out-Null
-		& git clone --quiet --depth 1 --branch $ref "https://github.com/$Repo.git" $src
-		if ($LASTEXITCODE -ne 0) { Stop-Install "cannot clone $Repo at $ref" }
+	} elseif (-not $present) {
+		# Stage the first clone too, so an interrupted clone cannot poison the
+		# canonical cache path for the next run.
+		$stage = "$src.clone.$([guid]::NewGuid().ToString('N'))"
+		Write-Step 'checkout' "cloning $ref into $src"
+		& git clone --quiet --depth 1 --branch $ref $repoUrl $stage
+		if ($LASTEXITCODE -ne 0) {
+			Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+			Stop-Install "cannot clone $Repo at $ref"
+		}
+		try {
+			Move-Item -LiteralPath $stage -Destination $src -ErrorAction Stop
+		} catch {
+			Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+			Stop-Install "cannot place source checkout at $src"
+		}
 	}
 
 	Write-Step 'build' "cargo build --release  $($script:CDim)(the analysis stack is large - expect a long build)$($script:CReset)"
@@ -719,7 +757,6 @@ function Invoke-Install {
 		if ($chosen -eq 'Binary') {
 			if (-not (Install-FromRelease)) {
 				if ($auto) {
-					Write-Note 'no binary available - building from source instead'
 					$chosen = 'Source'
 				} else {
 					Stop-Install 'the requested binary install could not be completed'

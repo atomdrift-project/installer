@@ -15,6 +15,7 @@ if ($script:Target -ne $script:Self) {
 Write-Host "ok - native platform -> $($script:Self)"
 
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "atomscan-installer-test-$([guid]::NewGuid().ToString('N'))"
+$oldLocalAppData = $env:LOCALAPPDATA
 $script:InstallDir = Join-Path $root 'bin'
 New-Item -ItemType Directory -Force -Path $script:InstallDir | Out-Null
 
@@ -90,6 +91,64 @@ public static class FixtureTwo {
 	if ($script:Installed -ne $expectedInstall) { throw "installed at unexpected path $($script:Installed)" }
 	if ((Get-InstalledVersion $script:Installed) -ne '9.9.10') { throw 'end-to-end fixture does not run' }
 	Write-Host "ok - end-to-end binary install -> $($script:Installed)"
+
+	# Source checkouts are cloned into a unique sibling first. Exercise recovery
+	# from a pre-existing non-Git cache and reuse of the promoted checkout.
+	$env:LOCALAPPDATA = Join-Path $root 'local-app-data'
+	$sourceCache = Join-Path $env:LOCALAPPDATA 'atomdrift\scan-src'
+	New-Item -ItemType Directory -Force -Path $sourceCache | Out-Null
+	[System.IO.File]::WriteAllText((Join-Path $sourceCache 'interrupted'), "partial`n")
+	$script:MockClones = 0
+	$script:MockFetches = 0
+	$script:MockCheckouts = 0
+	$script:MockOrigin = 'https://github.com/atomdrift-project/scan.git'
+	function git {
+		if ($args[0] -eq 'clone') {
+			$mockDest = "$($args[-1])"
+			New-Item -ItemType Directory -Force -Path (Join-Path $mockDest '.git') | Out-Null
+			$script:MockClones++
+			$global:LASTEXITCODE = 0
+			return
+		}
+		if ($args[0] -eq '-C') {
+			switch ($args[2]) {
+				'remote' { Write-Output $script:MockOrigin }
+				'fetch' { $script:MockFetches++ }
+				'checkout' { $script:MockCheckouts++ }
+				default { throw "unexpected mocked git operation: $($args[2])" }
+			}
+			$global:LASTEXITCODE = 0
+			return
+		}
+		throw "unexpected mocked git invocation: $args"
+	}
+	function cargo {
+		$mockBuilt = Join-Path (Get-Location) 'target\release'
+		New-Item -ItemType Directory -Force -Path $mockBuilt | Out-Null
+		Copy-Item -LiteralPath $fixtureOne -Destination (Join-Path $mockBuilt 'atomscan.exe') -Force
+		$global:LASTEXITCODE = 0
+	}
+
+	$Version = '2.5.0'
+	$Force = $true
+	$script:InstallDir = Join-Path $root 'source-bin'
+	New-Item -ItemType Directory -Force -Path $script:InstallDir | Out-Null
+	Install-FromSource
+	if (-not (Test-Path -LiteralPath (Join-Path $sourceCache '.git'))) { throw 'source cache repair failed' }
+	if (Test-Path -LiteralPath (Join-Path $sourceCache 'interrupted')) { throw 'incomplete source cache survived repair' }
+	if ($script:MockClones -ne 1) { throw 'source cache repair did not clone exactly once' }
+
+	Install-FromSource
+	if ($script:MockClones -ne 1 -or $script:MockFetches -ne 1 -or $script:MockCheckouts -ne 1) {
+		throw 'valid source cache was not reused'
+	}
+	$script:MockOrigin = 'https://example.invalid/not-atomdrift.git'
+	Install-FromSource
+	if ($script:MockClones -ne 2) { throw 'wrong-origin source cache was not replaced' }
+	Write-Host 'ok - source cache repair and reuse'
 } finally {
+	Remove-Item Function:\git -Force -ErrorAction SilentlyContinue
+	Remove-Item Function:\cargo -Force -ErrorAction SilentlyContinue
+	$env:LOCALAPPDATA = $oldLocalAppData
 	Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }

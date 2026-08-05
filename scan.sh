@@ -72,6 +72,10 @@ BREW_PREFIX=""  # Homebrew root, empty when there is no Homebrew
 DOWNLOADER=""   # curl | wget | fetch | ftp
 WGET_MODERN=0   # GNU wget (spider, header dumps) rather than busybox wget
 TMP=""          # scratch directory, removed on exit
+INSTALL_TMP=""  # same-directory binary staging file, removed on failure
+SOURCE_STAGE="" # staged source clone, removed when an install is interrupted
+SOURCE_OLD=""   # previous checkout, restored if a staged swap is interrupted
+SOURCE_DEST=""  # canonical checkout path paired with SOURCE_OLD
 
 usage() {
 	cat <<EOF
@@ -217,6 +221,19 @@ banner() {
 
 cleanup() {
 	[ -n "$TMP" ] && rm -rf "$TMP"
+	if [ -n "$INSTALL_TMP" ]; then
+		if [ "$INSTALL_PRIVILEGED" = 1 ] && [ -n "$INSTALL_ESCALATOR" ]; then
+			"$INSTALL_ESCALATOR" rm -f "$INSTALL_TMP" 2>/dev/null || :
+		else
+			rm -f "$INSTALL_TMP" 2>/dev/null || :
+		fi
+	fi
+	[ -n "$SOURCE_STAGE" ] && rm -rf "$SOURCE_STAGE"
+	if [ -n "$SOURCE_OLD" ]; then
+		if [ -n "$SOURCE_DEST" ] && [ ! -e "$SOURCE_DEST" ] && [ ! -L "$SOURCE_DEST" ]; then
+			mv "$SOURCE_OLD" "$SOURCE_DEST" 2>/dev/null || :
+		fi
+	fi
 	return 0
 }
 
@@ -307,10 +324,9 @@ detect_platform() {
 		[ "$dp_t" = "$SELF" ] && TARGET=$SELF
 	done
 
-	PLATFORM="$SELF"
-	if [ -n "$dp_desc" ]; then
-		PLATFORM="$PLATFORM  ${C_DIM}${dp_desc}${C_RESET}"
-	fi
+	# Keep the compiler target internal. Human output should identify the OS
+	# once, with the architecture as the useful secondary detail.
+	PLATFORM="${dp_desc% }  ${C_DIM}· $dp_arch${C_RESET}"
 	return 0
 }
 
@@ -688,21 +704,35 @@ resolve_install_dir() {
 install_binary_file() {
 	ibf_dest="$INSTALL_DIR/$BIN"
 	ibf_tmp="$INSTALL_DIR/.$BIN.new.$$"
+	INSTALL_TMP=$ibf_tmp
 	if [ "$INSTALL_PRIVILEGED" = 1 ]; then
-		"$INSTALL_ESCALATOR" cp "$1" "$ibf_tmp" || die "cannot write to $INSTALL_DIR with $INSTALL_ESCALATOR"
-		"$INSTALL_ESCALATOR" chmod 755 "$ibf_tmp" || die "cannot make $ibf_tmp executable"
+		"$INSTALL_ESCALATOR" cp "$1" "$ibf_tmp" || {
+			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
+			die "cannot write to $INSTALL_DIR with $INSTALL_ESCALATOR"
+		}
+		"$INSTALL_ESCALATOR" chmod 755 "$ibf_tmp" || {
+			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
+			die "cannot make $ibf_tmp executable"
+		}
 		"$INSTALL_ESCALATOR" mv -f "$ibf_tmp" "$ibf_dest" || {
 			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
 			die "cannot replace $ibf_dest with $INSTALL_ESCALATOR"
 		}
 	else
-		cp "$1" "$ibf_tmp" || die "cannot write to $INSTALL_DIR"
-		chmod 755 "$ibf_tmp" || die "cannot make $ibf_tmp executable"
+		cp "$1" "$ibf_tmp" || {
+			rm -f "$ibf_tmp" 2>/dev/null || :
+			die "cannot write to $INSTALL_DIR"
+		}
+		chmod 755 "$ibf_tmp" || {
+			rm -f "$ibf_tmp" 2>/dev/null || :
+			die "cannot make $ibf_tmp executable"
+		}
 		mv -f "$ibf_tmp" "$ibf_dest" || {
 			rm -f "$ibf_tmp"
 			die "cannot replace $ibf_dest"
 		}
 	fi
+	INSTALL_TMP=""
 	INSTALLED=$ibf_dest
 	CHANGED=1
 }
@@ -788,6 +818,7 @@ install_binary() {
 		warn "no published binary for this platform"
 		return 1
 	fi
+	[ -n "$DOWNLOADER" ] || find_downloader
 
 	if [ -n "$OPT_VERSION" ]; then
 		VERSION=$OPT_VERSION
@@ -863,8 +894,20 @@ rust_hint() {
 	fi
 }
 
+# Reserve an unpredictable, same-filesystem directory for a Git clone. Git can
+# clone into an existing empty directory, and the later rename into the cache is
+# atomic. The fallback covers older mktemp implementations without templates.
+make_source_stage() {
+	mss_dest=$1
+	SOURCE_STAGE=$(mktemp -d "${mss_dest}.clone.XXXXXX" 2>/dev/null || :)
+	if [ -z "$SOURCE_STAGE" ]; then
+		SOURCE_STAGE="${mss_dest}.clone.${TMP##*/}.$$"
+		(umask 077 && mkdir "$SOURCE_STAGE") || die "cannot stage a source checkout beside $mss_dest"
+	fi
+}
+
 install_source() {
-	step method "source build  ${C_DIM}git + cargo${C_RESET}"
+	step method "source  ${C_DIM}git + cargo${C_RESET}"
 
 	command -v git >/dev/null 2>&1 || die "a source build needs git"
 	command -v cargo >/dev/null 2>&1 || die "a source build needs Rust 1.94 or newer:
@@ -874,12 +917,18 @@ install_source() {
 		die "a source build needs a C/C++ toolchain (cc, gcc, or clang)"
 	fi
 
-	is_ref=main
+	is_ref=""
 	if [ -n "$OPT_VERSION" ]; then
 		is_ref="v$OPT_VERSION"
+	elif [ -n "$VERSION" ]; then
+		# Auto mode may already have resolved the release before discovering that
+		# this platform has no archive. Reuse it instead of making another request.
+		is_ref="v$VERSION"
 	else
+		[ -n "$DOWNLOADER" ] || find_downloader
 		is_latest=$(resolve_latest || :)
-		[ -n "$is_latest" ] && is_ref=$is_latest
+		[ -n "$is_latest" ] || die "could not work out the latest source release; re-run or specify --version"
+		is_ref=$is_latest
 	fi
 	VERSION=${is_ref#v}
 
@@ -900,37 +949,85 @@ install_source() {
 	*) [ "$is_free" -lt 10 ] && warn "only ${is_free} GB free at $is_src — a source build wants about 10 GB" ;;
 	esac
 
-	if [ -d "$is_src/.git" ]; then
-		step source "updating $is_src"
-		git -C "$is_src" fetch --quiet --depth 1 origin "$is_ref" || die "cannot fetch $is_ref"
-		git -C "$is_src" checkout --quiet --force FETCH_HEAD || die "cannot check out $is_ref"
-	elif [ -e "$is_src" ] || [ -L "$is_src" ]; then
-		# A killed clone (or an older installer) can leave a non-Git directory
-		# here. Clone beside it first so a network failure leaves that directory
-		# untouched, then swap the completed checkout into place.
-		is_stage="${is_src}.clone.$$"
-		is_old="${is_src}.old.$$"
-		step source "repairing incomplete checkout at $is_src"
-		rm -rf "$is_stage" "$is_old"
-		git clone --quiet --depth 1 --branch "$is_ref" "https://github.com/$REPO.git" "$is_stage" || {
+	is_url="https://github.com/$REPO.git"
+	is_present=0
+	is_repair=0
+	if [ -e "$is_src" ] || [ -L "$is_src" ]; then
+		is_present=1
+	fi
+	if [ -d "$is_src/.git" ] || [ -f "$is_src/.git" ]; then
+		is_origin=$(git -C "$is_src" remote get-url origin 2>/dev/null || :)
+		if [ "$is_origin" != "$is_url" ]; then
+			warn "cached source checkout has an unexpected origin — replacing it"
+			is_repair=1
+		else
+			step checkout "updating $is_src"
+			if ! git -C "$is_src" fetch --quiet --depth 1 origin "$is_ref"; then
+				warn "cached source checkout could not be fetched — replacing it"
+				is_repair=1
+			elif ! git -C "$is_src" checkout --quiet --force FETCH_HEAD; then
+				warn "cached source checkout could not be reset — replacing it"
+				is_repair=1
+			fi
+		fi
+	elif [ "$is_present" = 1 ]; then
+		is_repair=1
+	fi
+
+	if [ "$is_repair" = 1 ]; then
+		# Clone beside the old cache first so another network failure leaves it
+		# available, then swap the completed checkout into place.
+		make_source_stage "$is_src"
+		is_stage=$SOURCE_STAGE
+		is_old="${is_stage}.old"
+		step checkout "repairing $is_src"
+		git clone --quiet --depth 1 --branch "$is_ref" "$is_url" "$is_stage" || {
 			rm -rf "$is_stage"
+			SOURCE_STAGE=""
 			die "cannot clone $REPO at $is_ref"
 		}
+		SOURCE_OLD=$is_old
+		SOURCE_DEST=$is_src
 		mv "$is_src" "$is_old" || {
+			SOURCE_OLD=""
+			SOURCE_DEST=""
 			rm -rf "$is_stage"
+			SOURCE_STAGE=""
 			die "cannot replace incomplete checkout at $is_src"
 		}
 		if mv "$is_stage" "$is_src"; then
-			rm -rf "$is_old"
+			SOURCE_STAGE=""
+			if ! rm -rf "$is_old"; then
+				warn "old source cache remains at $is_old"
+			fi
+			SOURCE_OLD=""
+			SOURCE_DEST=""
 		else
-			mv "$is_old" "$is_src" 2>/dev/null || :
+			if mv "$is_old" "$is_src" 2>/dev/null; then
+				SOURCE_OLD=""
+				SOURCE_DEST=""
+			fi
 			rm -rf "$is_stage"
+			SOURCE_STAGE=""
 			die "cannot replace incomplete checkout at $is_src"
 		fi
-	else
-		step source "cloning $is_ref into $is_src"
-		git clone --quiet --depth 1 --branch "$is_ref" "https://github.com/$REPO.git" "$is_src" ||
+	elif [ "$is_present" = 0 ]; then
+		# Stage even the first clone: an interrupted download must not turn the
+		# canonical cache path into a destination that the next run cannot use.
+		make_source_stage "$is_src"
+		is_stage=$SOURCE_STAGE
+		step checkout "cloning $is_ref into $is_src"
+		git clone --quiet --depth 1 --branch "$is_ref" "$is_url" "$is_stage" || {
+			rm -rf "$is_stage"
+			SOURCE_STAGE=""
 			die "cannot clone $REPO at $is_ref"
+		}
+		mv "$is_stage" "$is_src" || {
+			rm -rf "$is_stage"
+			SOURCE_STAGE=""
+			die "cannot place source checkout at $is_src"
+		}
+		SOURCE_STAGE=""
 	fi
 
 	step build "cargo build --release  ${C_DIM}(the analysis stack is large — expect minutes)${C_RESET}"
@@ -1093,7 +1190,6 @@ main() {
 	trap 'exit 130' INT
 	trap 'exit 143' TERM HUP
 	make_tmpdir
-	find_downloader
 
 	banner
 	detect_platform
@@ -1138,7 +1234,6 @@ main() {
 		resolve_install_dir
 		install_binary || {
 			if [ "$main_auto" = 1 ]; then
-				note "no binary available — building from source instead"
 				METHOD=source
 			else
 				die "the requested binary install could not be completed"
