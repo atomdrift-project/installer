@@ -63,7 +63,13 @@ jobs:
           zsh --emulate sh tests/install-dir.sh
 
       - name: Test installer index
-        run: sh tests/index.sh
+        run: |
+          sh tests/index.sh
+          sh tests/brew.sh
+          dash tests/brew.sh
+          ksh tests/brew.sh
+          bash --posix tests/brew.sh
+          zsh --emulate sh tests/brew.sh
 
   linux-distros:
     name: Linux / ${{ matrix.name }}

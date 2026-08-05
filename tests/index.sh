@@ -20,7 +20,7 @@ assert_page_contains() {
 
 assert_page_contains 'curl -fsSL https://install.atomdrift.org | sh'
 assert_page_contains 'irm https://install.atomdrift.org/ps1 | iex'
-assert_page_contains 'brew install atomdrift/tap/scan'
+assert_page_contains 'brew install atomdrift-project/tap/scan'
 assert_page_contains 'https://github.com/atomdrift-project/scan/releases/latest'
 assert_page_contains 'SHA256SUMS'
 assert_page_contains 'Pre-install check'
@@ -31,7 +31,9 @@ assert_page_contains 'sudo'
 homebrew_line=$(grep -n 'data-installer="homebrew"' "$PAGE" | sed -n '1s/:.*//p')
 shell_line=$(grep -n 'data-installer="unix"' "$PAGE" | sed -n '1s/:.*//p')
 [ "$homebrew_line" -lt "$shell_line" ] || fail 'Homebrew is not the first installation method'
-[ "$(grep -c 'class="command-line"' "$PAGE")" = 2 ] || fail 'Homebrew commands do not have separate prompts'
+if grep -F 'atomdrift/tap' "$PAGE" >/dev/null; then
+	fail 'installer page still uses the legacy tap namespace'
+fi
 
 for platform in macOS Linux FreeBSD OpenBSD NetBSD 'DragonFly BSD' Solaris illumos Android Windows; do
 	assert_page_contains "$platform"

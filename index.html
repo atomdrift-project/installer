@@ -225,10 +225,6 @@
     .command-row { align-items: center; display: flex; gap: 10px; min-width: 0; padding: 14px; }
     .command-row code { color: #fff; flex: 1; font: 12.5px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
     .command-row code::before { color: var(--toxic); content: "$ "; }
-    .command-row code.multiline { white-space: normal; }
-    .command-row code.multiline::before { content: none; }
-    .command-line { display: block; }
-    .command-line::before { color: var(--toxic); content: "$ "; }
 
     .copy-button {
       background: #222;
@@ -371,15 +367,12 @@
           <div class="card-main">
             <div class="card-kicker"><span class="method-kind">Package manager</span><span class="badge">Homebrew</span></div>
             <h3>Homebrew</h3>
-            <p class="card-description">Installs from the Atomdrift tap. Homebrew controls the prefix, dependency handling, upgrades, and package removal.</p>
+            <p class="card-description">Installs from the Atomdrift tap; Homebrew adds the tap automatically and controls the prefix, dependencies, upgrades, and removal.</p>
             <div class="terminal">
               <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
               <div class="command-row">
-                <code class="multiline">
-                  <span class="command-line">brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git</span>
-                  <span class="command-line">brew install atomdrift/tap/scan</span>
-                </code>
-                <button class="copy-button" type="button" data-copy="brew tap atomdrift/tap https://github.com/atomdrift-project/homebrew-tap.git&#10;brew install atomdrift/tap/scan" aria-label="Copy Homebrew install commands">copy</button>
+                <code>brew install atomdrift-project/tap/scan</code>
+                <button class="copy-button" type="button" data-copy="brew install atomdrift-project/tap/scan" aria-label="Copy Homebrew install command">copy</button>
               </div>
             </div>
           </div>

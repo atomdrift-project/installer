@@ -24,8 +24,7 @@ set -eu
 
 REPO="atomdrift-project/scan"
 BIN="atomscan"
-TAP="atomdrift/tap"
-TAP_URL="https://github.com/atomdrift-project/homebrew-tap.git"
+TAP="atomdrift-project/tap"
 
 # Targets published by .github/workflows/release.yml. Anything else takes the
 # source path.
@@ -722,12 +721,6 @@ brew_works() {
 
 install_brew() {
 	step method "Homebrew  ${C_DIM}$TAP/scan${C_RESET}"
-
-	if ! brew tap 2>/dev/null | grep -qx "$TAP"; then
-		# The tap's Homebrew handle and its GitHub org differ, so it can only be
-		# added with an explicit URL.
-		brew tap "$TAP" "$TAP_URL" >/dev/null 2>&1 || return 1
-	fi
 
 	br_prefix=$(brew --prefix 2>/dev/null) || return 1
 	if brew list --formula "$TAP/scan" >/dev/null 2>&1; then
