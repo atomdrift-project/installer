@@ -802,15 +802,59 @@ resolve_install_dir() {
    Add \$HOME/.local/bin or \$HOME/bin to PATH, or choose one with --dir."
 }
 
-# install_binary_file SRC — move SRC into place atomically.
+# install_binary_file SRC — install SRC with mode 0755.
 #
-# Writing beside the destination and renaming means a reader sees either the old
-# binary or the new one and never a half-written file, which matters most when
-# the thing being replaced is a binary that is currently running.
+# BSD and macOS use their native atomic install modes. GNU/Linux deliberately
+# favors one straightforward install operation. Other systems retain the
+# portable same-directory staging and rename fallback.
 install_binary_file() {
 	ibf_dest="$INSTALL_DIR/$BIN"
 	ibf_tmp="$INSTALL_DIR/.$BIN.new.$$"
 	if [ "$INSTALL_PRIVILEGED" = 1 ]; then
+		# The BSD install tools can perform the same-directory temporary copy and
+		# atomic rename themselves. Their safe-copy flags unfortunately differ.
+		ibf_install_flag=""
+		ibf_os=$(uname -s 2>/dev/null || :)
+		case $ibf_os in
+		Darwin | FreeBSD | OpenBSD) ibf_install_flag=-S ;;
+		NetBSD) ibf_install_flag=-r ;;
+		esac
+		if [ -n "$ibf_install_flag" ] && command -v install >/dev/null 2>&1; then
+			ibf_display="$INSTALL_ESCALATOR install $ibf_install_flag -m 755 $(quote_arg "$1") $(quote_arg "$ibf_dest")"
+			if [ "$PRIVILEGE_APPROVED" = 1 ]; then
+				step privilege "$ibf_display"
+			else
+				gap
+				approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
+			fi
+			"$INSTALL_ESCALATOR" install "$ibf_install_flag" -m 755 "$1" "$ibf_dest" ||
+				die "cannot install $ibf_dest with $INSTALL_ESCALATOR"
+			INSTALLED=$ibf_dest
+			CHANGED=1
+			return 0
+		fi
+
+		# GNU install has no atomic-replacement mode. Prefer its simple direct
+		# operation; BusyBox/toybox systems fall back when the applet is absent.
+		case $ibf_os in
+		Linux | GNU)
+			if command -v install >/dev/null 2>&1; then
+				ibf_display="$INSTALL_ESCALATOR install -m 755 $(quote_arg "$1") $(quote_arg "$ibf_dest")"
+				if [ "$PRIVILEGE_APPROVED" = 1 ]; then
+					step privilege "$ibf_display"
+				else
+					gap
+					approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
+				fi
+				"$INSTALL_ESCALATOR" install -m 755 "$1" "$ibf_dest" ||
+					die "cannot install $ibf_dest with $INSTALL_ESCALATOR"
+				INSTALLED=$ibf_dest
+				CHANGED=1
+				return 0
+			fi
+			;;
+		esac
+
 		ibf_display="$INSTALL_ESCALATOR cp $(quote_arg "$1") $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR chmod 755 $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR mv -f $(quote_arg "$ibf_tmp") $(quote_arg "$ibf_dest")"
 		if [ "$PRIVILEGE_APPROVED" = 1 ]; then
 			step privilege "$INSTALL_ESCALATOR  ${C_DIM}(atomic binary install)${C_RESET}"

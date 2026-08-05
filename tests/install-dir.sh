@@ -131,7 +131,7 @@ chmod 755 "$existing_fixture"
 install_binary_file "$existing_fixture"
 [ "$APPROVAL_COUNT" = 1 ] || fail 'first protected write did not request approval'
 case $APPROVAL_COMMAND in
-"doas cp '$existing_fixture' "*" && doas chmod 755 "*" && doas mv -f "*" '$privileged_existing/atomscan'") : ;;
+"doas install -m 755 '$existing_fixture' '$privileged_existing/atomscan'") : ;;
 *) fail "protected write did not show its exact operations: $APPROVAL_COMMAND" ;;
 esac
 printf 'ok - protected existing directory defers approval until the first write\n'
@@ -153,6 +153,38 @@ chmod 755 "$fixture"
 install_binary_file "$fixture"
 [ "$(installed_version "$INSTALLED")" = 9.9.9 ] || fail 'escalated atomic install failed'
 printf 'ok - explicit --dir uses the escalation adapter\n'
+
+# Native BSD/macOS install tools perform their own temporary copy and atomic
+# rename. Their safe-copy flag is -S except on NetBSD, where it is -r.
+check_native_atomic_install() (
+	nai_os=$1 nai_flag=$2
+	nai_dir="$TMP/$nai_os-system/bin"
+	command mkdir -p "$nai_dir"
+	uname() { printf '%s\n' "$nai_os"; }
+	# shellcheck disable=SC2329 # Invoked indirectly through INSTALL_ESCALATOR.
+	doas() {
+		[ "$1" = install ] || fail "unexpected $nai_os privileged command: $*"
+		[ "$2" = "$nai_flag" ] && [ "$3" = -m ] && [ "$4" = 755 ] ||
+			fail "$nai_os install lost its atomic mode flags: $*"
+		command cp "$5" "$6"
+		command chmod 755 "$6"
+	}
+	INSTALL_DIR=$nai_dir
+	INSTALL_ESCALATOR=doas
+	INSTALL_PRIVILEGED=1
+	PRIVILEGE_APPROVED=0
+	OPT_QUIET=1
+	APPROVAL_COMMAND=""
+	install_binary_file "$fixture"
+	[ "$APPROVAL_COMMAND" = "doas install $nai_flag -m 755 '$fixture' '$nai_dir/atomscan'" ] ||
+		fail "$nai_os approval did not show doas install: $APPROVAL_COMMAND"
+	[ "$(installed_version "$INSTALLED")" = 9.9.9 ] || fail "$nai_os native install adapter failed"
+)
+check_native_atomic_install FreeBSD -S
+check_native_atomic_install OpenBSD -S
+check_native_atomic_install NetBSD -r
+check_native_atomic_install Darwin -S
+printf 'ok - BSD and macOS use one native atomic install operation\n'
 
 # A legacy /usr/bin install must not pin upgrades there on non-Linux systems.
 # Mock directory preparation so this checks policy without touching host paths.
