@@ -20,6 +20,9 @@ assert_page_contains() {
 
 assert_page_contains 'curl -fsSL https://install.atomdrift.org/scan.sh | sh'
 assert_page_contains 'irm https://install.atomdrift.org/scan.ps1 | iex'
+assert_page_contains 'The open-source malware scanner that doesn’t suck.'
+assert_page_contains 'files, directories, archives, packages, URLs, and running processes'
+assert_page_contains 'No cloud scanner, API key, GPU, or sample upload required.'
 assert_page_contains 'Uses Homebrew when available'
 assert_page_contains 'https://github.com/atomdrift-project/scan/releases/latest'
 assert_page_contains 'SHA256SUMS'

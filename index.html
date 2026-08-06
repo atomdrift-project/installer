@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Install Atomdrift Scan on Linux, macOS, Windows, BSD, Android, Solaris, and illumos.">
+  <meta name="description" content="Install Atomdrift Scan, the open-source malware and supply-chain scanner for files, packages, URLs, and running processes.">
   <meta name="theme-color" content="#d0ff00">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Install Atomdrift Scan">
-  <meta property="og:description" content="Supported installation methods, release targets, and verification behavior for Atomdrift Scan.">
+  <meta property="og:description" content="Local malware and supply-chain scanning with static analysis and CPU-based ML. No cloud scanner, API key, GPU, or sample upload required.">
   <title>Install Atomdrift Scan</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>%E2%9A%9B</text></svg>">
   <style>
@@ -128,9 +128,18 @@
 
     .hero-copy {
       color: var(--graphite);
-      font-size: 18px;
+      font-size: 16px;
+      margin-top: 8px;
+      max-width: 760px;
+    }
+
+    .hero-tagline {
+      color: var(--graphite);
+      font-family: var(--display);
+      font-size: clamp(20px, 3vw, 25px);
+      font-weight: 700;
+      letter-spacing: -.35px;
       margin-top: 12px;
-      max-width: 560px;
     }
 
     .section-head { margin: 38px 0 14px; }
@@ -270,7 +279,8 @@
   <main>
     <section class="hero">
       <h1>Install Atomdrift Scan</h1>
-      <p class="hero-copy">Choose your platform. The installer detects the rest.</p>
+      <p class="hero-tagline">The open-source malware scanner that doesn’t suck.</p>
+      <p class="hero-copy">Scan files, directories, archives, packages, URLs, and running processes with local static analysis and CPU-based ML. No cloud scanner, API key, GPU, or sample upload required.</p>
     </section>
 
     <section id="installers" aria-labelledby="installers-title">
