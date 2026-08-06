@@ -33,6 +33,9 @@ x86_64-unknown-linux-gnu
 aarch64-unknown-linux-gnu
 x86_64-unknown-linux-musl
 aarch64-unknown-linux-musl
+arm-unknown-linux-musleabihf
+armv7-unknown-linux-musleabihf
+loongarch64-unknown-linux-musl
 s390x-unknown-linux-gnu
 riscv64gc-unknown-linux-gnu
 powerpc64le-unknown-linux-gnu
@@ -271,6 +274,9 @@ detect_platform() {
 	x86_64 | amd64) dp_arch=x86_64 ;;
 	i86pc) dp_arch=x86_64 ;;
 	aarch64 | arm64) dp_arch=aarch64 ;;
+	armv6 | armv6l) dp_arch=arm ;;
+	armv7 | armv7l | armv8l | armhf) dp_arch=armv7 ;;
+	loongarch64) dp_arch=loongarch64 ;;
 	riscv64 | riscv64gc) dp_arch=riscv64gc ;;
 	ppc64le | powerpc64le) dp_arch=powerpc64le ;;
 	esac
@@ -289,7 +295,15 @@ detect_platform() {
 			fi
 			;;
 		esac
-		SELF="$dp_arch-unknown-linux-$dp_libc"
+		# The ARM32 and LoongArch release artifacts are static musl binaries.
+		# Select them on any Linux libc: this is both more portable for embedded
+		# systems (where uClibc remains common) and avoids imposing the cross
+		# image's glibc floor. ARM32 targets the standard hard-float ABI.
+		case $dp_arch in
+		arm | armv7) SELF="$dp_arch-unknown-linux-musleabihf" ;;
+		loongarch64) SELF="$dp_arch-unknown-linux-musl" ;;
+		*) SELF="$dp_arch-unknown-linux-$dp_libc" ;;
+		esac
 		dp_desc="Linux"
 		[ "$dp_operating" = Android ] && dp_desc=Android
 		if [ -r /etc/os-release ]; then

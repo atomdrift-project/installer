@@ -90,7 +90,15 @@ assert_platform 'Linux/openEuler x86_64 glibc' Linux x86_64 GNU/Linux test 0 0 x
 assert_platform 'Linux arm64 glibc' Linux arm64 GNU/Linux test 0 0 aarch64-unknown-linux-gnu
 assert_platform 'Linux x86_64 musl' Linux x86_64 GNU/Linux test 0 1 x86_64-unknown-linux-musl
 assert_platform 'Linux arm64 musl' Linux aarch64 GNU/Linux test 0 1 aarch64-unknown-linux-musl
+assert_platform 'Linux ARMv6 glibc' Linux armv6l GNU/Linux test 0 0 arm-unknown-linux-musleabihf
+assert_platform 'Linux ARMv6 musl' Linux armv6l GNU/Linux test 0 1 arm-unknown-linux-musleabihf
+assert_platform 'Linux ARMv7 glibc' Linux armv7l GNU/Linux test 0 0 armv7-unknown-linux-musleabihf
+assert_platform 'Linux ARMv7 musl' Linux armv7l GNU/Linux test 0 1 armv7-unknown-linux-musleabihf
+assert_platform 'Linux 32-bit ARMv8 userland' Linux armv8l GNU/Linux test 0 0 armv7-unknown-linux-musleabihf
+assert_platform 'Linux LoongArch64 glibc' Linux loongarch64 GNU/Linux test 0 0 loongarch64-unknown-linux-musl
+assert_platform 'Linux LoongArch64 musl' Linux loongarch64 GNU/Linux test 0 1 loongarch64-unknown-linux-musl
 assert_platform 'Android' Linux x86_64 Android test 0 0 x86_64-unknown-linux-musl
+assert_platform 'Android ARMv7' Linux armv7l Android test 0 0 armv7-unknown-linux-musleabihf
 assert_platform 'Linux s390x' Linux s390x GNU/Linux test 0 0 s390x-unknown-linux-gnu
 assert_platform 'Linux riscv64' Linux riscv64 GNU/Linux test 0 0 riscv64gc-unknown-linux-gnu
 assert_platform 'Linux powerpc64le' Linux ppc64le GNU/Linux test 0 0 powerpc64le-unknown-linux-gnu
@@ -108,12 +116,12 @@ assert_platform 'experimental GNU/Hurd mapping' GNU x86_64 GNU test 0 0 x86_64-u
 assert_platform 'illumos/OpenIndiana/Tribblix' SunOS i86pc illumos 'omnios-r151058' 0 0 x86_64-unknown-illumos
 assert_platform 'Solaris' SunOS i86pc Solaris '11.4' 0 0 x86_64-pc-solaris
 
-MOCK_OS=Linux MOCK_ARCH=armv7l MOCK_OPERATING=GNU/Linux MOCK_VERSION=test
+MOCK_OS=Linux MOCK_ARCH=mipsel MOCK_OPERATING=GNU/Linux MOCK_VERSION=test
 MOCK_ARM64=0 MOCK_MUSL=0
 detect_platform
-[ "$SELF" = armv7l-unknown-linux-gnu ] || fail "unsupported Linux target: got $SELF"
+[ "$SELF" = mipsel-unknown-linux-gnu ] || fail "unsupported Linux target: got $SELF"
 [ -z "$TARGET" ] || fail "unsupported Linux target unexpectedly selected $TARGET"
-printf 'ok - unsupported targets select the source path\n'
+printf 'ok - unsupported MIPS targets select the source path\n'
 
 MOCK_OS=MINGW64_NT MOCK_ARCH=x86_64
 if windows_output=$(detect_platform 2>&1); then

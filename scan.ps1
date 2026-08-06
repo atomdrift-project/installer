@@ -78,6 +78,8 @@ $ExeName = 'atomscan.exe'
 $Targets = @(
 	'x86_64-unknown-linux-gnu', 'aarch64-unknown-linux-gnu'
 	'x86_64-unknown-linux-musl', 'aarch64-unknown-linux-musl'
+	'arm-unknown-linux-musleabihf', 'armv7-unknown-linux-musleabihf'
+	'loongarch64-unknown-linux-musl'
 	's390x-unknown-linux-gnu', 'riscv64gc-unknown-linux-gnu'
 	'powerpc64le-unknown-linux-gnu'
 	'aarch64-apple-darwin', 'x86_64-apple-darwin'

@@ -304,6 +304,7 @@
           <div class="support">
             <p class="support-title">Runs on</p>
             <p class="support-copy">macOS · Linux · BSD · Solaris / illumos · Android</p>
+            <p class="support-copy">Linux binaries: x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE</p>
           </div>
         </article>
 
@@ -350,7 +351,7 @@
         <h2 id="behavior-title">What the installer does</h2>
       </div>
       <dl class="behavior-grid">
-        <div class="behavior-item"><dt>Detects</dt><dd>Matches the operating system, CPU, and Linux libc to the right install method and release.</dd></div>
+        <div class="behavior-item"><dt>Detects</dt><dd>Matches the operating system, CPU, and Linux libc to the right install method and release. Static ARM32 and LoongArch binaries also work across glibc, musl, and uClibc userlands.</dd></div>
         <div class="behavior-item"><dt>Verifies</dt><dd>Checks SHA-256 and available provenance, then runs <code>--version</code> before replacing anything.</dd></div>
         <div class="behavior-item"><dt>Installs safely</dt><dd>Uses a directory on PATH and replaces atomically. Privilege is requested only when needed.</dd></div>
       </dl>
