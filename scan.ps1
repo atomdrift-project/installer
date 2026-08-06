@@ -375,6 +375,29 @@ function Test-Provenance([string]$File) {
 	}
 }
 
+# Verify the signed checksum manifest with the portable Sigstore bundle. A
+# normal release uses the tag identity; a recovery publish is restricted to
+# main by release.yml and therefore uses the second identity.
+function Test-SigstoreManifest([string]$Manifest, [string]$Bundle, [string]$ReleaseVersion) {
+	if (-not (Get-Command cosign -ErrorAction SilentlyContinue)) { return '' }
+	$identities = @(
+		"https://github.com/$Repo/.github/workflows/release.yml@refs/tags/v$ReleaseVersion",
+		"https://github.com/$Repo/.github/workflows/release.yml@refs/heads/main"
+	)
+	foreach ($identity in $identities) {
+		try {
+			& cosign verify-blob $Manifest `
+				--bundle $Bundle `
+				--certificate-identity $identity `
+				--certificate-oidc-issuer 'https://token.actions.githubusercontent.com' *> $null
+			if ($LASTEXITCODE -eq 0) { return $identity }
+		} catch {
+			# Try the recovery identity before reporting failure to the caller.
+		}
+	}
+	return ''
+}
+
 # ---------------------------------------------------------------------------
 # Install location
 #
@@ -489,12 +512,37 @@ function Install-FromRelease {
 		Stop-Install "release v$($script:Resolved) publishes no SHA256SUMS - refusing to install unverified"
 	}
 
+	$sigstoreIdentity = ''
+	if (Get-Command cosign -ErrorAction SilentlyContinue) {
+		$bundle = Join-Path $script:Temp 'SHA256SUMS.sigstore.json'
+		$hasBundle = $false
+		try {
+			Save-Url "$base/SHA256SUMS.sigstore.json" $bundle 'SHA256SUMS.sigstore.json'
+			$hasBundle = $true
+		} catch {
+			# Older releases predate portable Sigstore bundles; retain the
+			# mandatory SHA-256 and optional GitHub attestation checks below.
+		}
+		if ($hasBundle) {
+			$sigstoreIdentity = Test-SigstoreManifest $sums $bundle $script:Resolved
+			if (-not $sigstoreIdentity) {
+				Stop-Install 'SHA256SUMS has an invalid Sigstore signature - refusing to install'
+			}
+		}
+	}
+
 	$digest = Test-Checksum $archive $sums $name
-	if (Test-Provenance $archive) {
+	$attested = Test-Provenance $archive
+	if ($sigstoreIdentity -and $attested) {
+		Write-Ok 'verified' "sha256 $digest  $($script:CDim)$([char]0x00B7)  sigstore signed  $([char]0x00B7)  provenance attested$($script:CReset)"
+	} elseif ($sigstoreIdentity) {
+		Write-Ok 'verified' "sha256 $digest  $($script:CDim)$([char]0x00B7)  sigstore signed$($script:CReset)"
+	} elseif ($attested) {
 		Write-Ok 'verified' "sha256 $digest  $($script:CDim)$([char]0x00B7)  provenance attested$($script:CReset)"
 	} else {
 		Write-Ok 'verified' "sha256 $digest"
 	}
+	if ($sigstoreIdentity) { Write-Note "sigstore signer  $sigstoreIdentity" }
 
 	# bsdtar has shipped in Windows since 10 build 17063 and reads .tar.gz
 	# directly; nothing else in the box does.

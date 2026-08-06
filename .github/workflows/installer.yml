@@ -151,7 +151,7 @@ jobs:
 
   macos:
     name: macOS / arm64
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -163,7 +163,7 @@ jobs:
 
   windows:
     name: Windows / PowerShell 5.1
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -195,10 +195,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: FreeBSD 15
+      - name: FreeBSD 15.1
         uses: vmactions/freebsd-vm@77ed28d336d03fe19a3f4f7266c1d2c4714dd79d # v1.5.2
         with:
-          release: "15.0"
+          release: "15.1"
           usesh: true
           run: sh tests/integration.sh x86_64-unknown-freebsd && sh tests/native-platform.sh x86_64-unknown-freebsd && sh tests/install-dir.sh
 
@@ -210,11 +210,11 @@ jobs:
           usesh: true
           run: sh tests/integration.sh x86_64-unknown-openbsd && sh tests/native-platform.sh x86_64-unknown-openbsd && sh tests/install-dir.sh
 
-      - name: NetBSD 10.1
+      - name: NetBSD 11.0
         if: ${{ !cancelled() }}
-        uses: vmactions/netbsd-vm@e7ac71b97abbe8437cec8859a5acf72dfa6a8be0 # v1.4.5
+        uses: vmactions/netbsd-vm@00081e82b14bc40114eb97f32b4455306828516b # v1.4.6
         with:
-          release: "10.1"
+          release: "11.0"
           usesh: true
           run: sh tests/integration.sh x86_64-unknown-netbsd && sh tests/native-platform.sh x86_64-unknown-netbsd && sh tests/install-dir.sh
 

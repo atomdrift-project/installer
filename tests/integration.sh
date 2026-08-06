@@ -47,12 +47,19 @@ fixture_digest=$(sha256_of "$fixture_archive")
 find_downloader() { DOWNLOADER=fixture; }
 http_ok() { return 0; }
 verify_provenance() { return 1; }
+cosign() { return 0; }
+verify_sigstore_manifest() {
+	printf '%s\n' 'https://github.com/atomdrift-project/scan/.github/workflows/release.yml@refs/tags/v9.9.9'
+}
 id() { printf '1000\n'; }
 current_install() { return 1; }
 http_get() {
 	case $1 in
 	*/SHA256SUMS)
 		printf '%s  %s\n' "$fixture_digest" "$fixture_name" >"$2"
+		;;
+	*/SHA256SUMS.sigstore.json)
+		printf '%s\n' '{}' >"$2"
 		;;
 	*/"$fixture_name")
 		cp "$fixture_archive" "$2"

@@ -83,9 +83,15 @@ public static class FixtureTwo {
 
 	function Test-UrlExists([string]$Url) { return $true }
 	function Test-Provenance([string]$File) { return $false }
+	function cosign { return }
+	function Test-SigstoreManifest([string]$Manifest, [string]$Bundle, [string]$ReleaseVersion) {
+		return 'https://github.com/atomdrift-project/scan/.github/workflows/release.yml@refs/tags/v9.9.10'
+	}
 	function Save-Url([string]$Url, [string]$Path, [string]$Label) {
 		if ($Url.EndsWith('/SHA256SUMS')) {
 			Copy-Item -LiteralPath $releaseSums -Destination $Path
+		} elseif ($Url.EndsWith('/SHA256SUMS.sigstore.json')) {
+			[System.IO.File]::WriteAllText($Path, '{}')
 		} elseif ($Url.EndsWith("/$archiveName")) {
 			Copy-Item -LiteralPath $archive -Destination $Path
 		} else {

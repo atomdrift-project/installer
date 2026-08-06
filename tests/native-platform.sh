@@ -56,6 +56,22 @@ verified=$(verify_checksum "$fixture_one" "$TMP/SHA256SUMS" atomscan-fixture)
 [ "$verified" = "$(printf '%s' "$digest" | cut -c1-12)" ] || fail 'checksum verification failed'
 printf 'ok - native SHA-256 verification\n'
 
+cosign() {
+	case " $* " in
+	*' --certificate-identity https://github.com/atomdrift-project/scan/.github/workflows/release.yml@refs/tags/v9.9.9 '*) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+sigstore_identity=$(verify_sigstore_manifest \
+	"$TMP/SHA256SUMS" "$TMP/SHA256SUMS.sigstore.json" 9.9.9)
+[ "$sigstore_identity" = 'https://github.com/atomdrift-project/scan/.github/workflows/release.yml@refs/tags/v9.9.9' ] ||
+	fail 'Sigstore verification did not enforce the release workflow identity'
+cosign() { return 1; }
+if verify_sigstore_manifest "$TMP/SHA256SUMS" "$TMP/SHA256SUMS.sigstore.json" 9.9.9 >/dev/null; then
+	fail 'invalid Sigstore bundle unexpectedly verified'
+fi
+printf 'ok - Sigstore identity verification\n'
+
 install_binary_file "$fixture_one"
 [ "$(installed_version "$INSTALLED")" = 9.9.9 ] || fail 'initial atomic install failed'
 install_binary_file "$fixture_two"

@@ -509,6 +509,27 @@ verify_provenance() {
 	gh attestation verify "$1" --repo "$REPO" >/dev/null 2>&1
 }
 
+# Verify the signed release manifest with a standard Sigstore bundle. Tag-push
+# releases carry the tag identity; a recovery publish is deliberately limited
+# to main by release.yml and carries that identity instead.
+verify_sigstore_manifest() {
+	command -v cosign >/dev/null 2>&1 || return 1
+	vsm_manifest=$1 vsm_bundle=$2 vsm_version=$3
+	vsm_tag="https://github.com/$REPO/.github/workflows/release.yml@refs/tags/v$vsm_version"
+	vsm_main="https://github.com/$REPO/.github/workflows/release.yml@refs/heads/main"
+	for vsm_identity in "$vsm_tag" "$vsm_main"; do
+		if cosign verify-blob "$vsm_manifest" \
+			--bundle "$vsm_bundle" \
+			--certificate-identity "$vsm_identity" \
+			--certificate-oidc-issuer https://token.actions.githubusercontent.com \
+			>/dev/null 2>&1; then
+			printf '%s\n' "$vsm_identity"
+			return 0
+		fi
+	done
+	return 1
+}
+
 # ---------------------------------------------------------------------------
 # Install locations
 # ---------------------------------------------------------------------------
@@ -1019,14 +1040,28 @@ install_binary() {
 
 	http_get "$ib_base/SHA256SUMS" "$TMP/SHA256SUMS" ||
 		die "release v$VERSION publishes no SHA256SUMS — refusing to install unverified"
+	ib_sigstore_identity=''
+	if command -v cosign >/dev/null 2>&1 &&
+		http_get "$ib_base/SHA256SUMS.sigstore.json" "$TMP/SHA256SUMS.sigstore.json" 2>/dev/null; then
+		ib_sigstore_identity=$(verify_sigstore_manifest \
+			"$TMP/SHA256SUMS" "$TMP/SHA256SUMS.sigstore.json" "$VERSION") ||
+			die "SHA256SUMS has an invalid Sigstore signature — refusing to install"
+	fi
 	ib_digest=$(verify_checksum "$TMP/$ib_name" "$TMP/SHA256SUMS" "$ib_name") ||
 		die "$ib_name failed verification — refusing to install"
 
-	if verify_provenance "$TMP/$ib_name"; then
+	ib_attested=0
+	verify_provenance "$TMP/$ib_name" && ib_attested=1
+	if [ -n "$ib_sigstore_identity" ] && [ "$ib_attested" = 1 ]; then
+		ok verified "sha256 $ib_digest  ${C_DIM}·  sigstore signed  ·  provenance attested${C_RESET}"
+	elif [ -n "$ib_sigstore_identity" ]; then
+		ok verified "sha256 $ib_digest  ${C_DIM}·  sigstore signed${C_RESET}"
+	elif [ "$ib_attested" = 1 ]; then
 		ok verified "sha256 $ib_digest  ${C_DIM}·  provenance attested${C_RESET}"
 	else
 		ok verified "sha256 $ib_digest"
 	fi
+	[ -z "$ib_sigstore_identity" ] || note "sigstore signer  $ib_sigstore_identity"
 
 	# Solaris and illumos tar have no -z; piping gzip works everywhere.
 	mkdir -p "$TMP/x"
