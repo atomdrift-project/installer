@@ -146,12 +146,14 @@
     .hero + section .section-head { margin-top: 0; }
     .section-head h2 { font-size: 22px; letter-spacing: -.4px; }
 
-    .installer-grid { align-items: stretch; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; min-width: 0; }
+    /* Two columns only while a card is still wide enough for the full command on one line. */
+    .installer-grid { align-items: stretch; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr)); gap: 18px; min-width: 0; }
 
     .installer-card {
       background: var(--white);
       border: 1px solid var(--border);
       border-radius: 14px;
+      container-type: inline-size;
       display: flex;
       flex-direction: column;
       min-width: 0;
@@ -163,7 +165,13 @@
       box-shadow: 0 10px 28px rgba(10, 10, 10, .07);
     }
 
-    .card-main { display: flex; flex: 0 0 255px; flex-direction: column; min-width: 0; padding: 24px; }
+    /* min-height keeps the two side-by-side cards' terminals on the same line.
+       A full-width card has no neighbour to line up with, so it drops the spacer. */
+    .card-main { display: flex; flex: 0 0 auto; flex-direction: column; min-height: 255px; min-width: 0; padding: 20px; }
+    @container (min-width: 640px) {
+      .card-main { min-height: 0; }
+      .card-main .terminal { margin-top: 20px; }
+    }
     .installer-card h3 { font-size: 22px; letter-spacing: -.3px; }
     .card-description { color: var(--graphite); font-size: 14px; margin-top: 5px; }
 
@@ -174,8 +182,8 @@
     .terminal-dot:nth-child(2) { background: #ffaf37; }
     .terminal-dot:nth-child(3) { background: #50c850; }
     .terminal-label { color: #8b8b92; font: 10px var(--mono); margin-left: 4px; text-transform: uppercase; }
-    .command-row { align-items: center; display: flex; gap: 10px; min-width: 0; padding: 14px; }
-    .command-row code { color: #fff; flex: 1; font: 12.5px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
+    .command-row { align-items: center; display: flex; gap: 8px; min-width: 0; padding: 12px; }
+    .command-row code { color: #fff; flex: 1; font: 12px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
     .command-row code::before { color: var(--toxic); content: "$ "; }
 
     .terminal-windows { border: 1px solid #d6d6d6; border-radius: 7px; }
@@ -196,13 +204,16 @@
       cursor: pointer;
       flex: 0 0 auto;
       font: 11px var(--mono);
-      padding: 7px 9px;
+      /* Fixed width so swapping to the "copied" label never reflows the command. */
+      min-width: 60px;
+      padding: 6px 8px;
+      text-align: center;
     }
 
     .copy-button:hover { border-color: var(--toxic-muted); color: var(--toxic); }
     .copy-button.copied { background: var(--toxic); border-color: var(--toxic); color: var(--carbon); }
 
-    .support { background: var(--cream); border-top: 1px solid var(--border); flex: 1; padding: 17px 24px 20px; }
+    .support { background: var(--cream); border-top: 1px solid var(--border); flex: 1; padding: 16px 20px 20px; }
     .support-title { color: var(--iron); font: 700 10px var(--mono); letter-spacing: .08em; margin-bottom: 9px; text-transform: uppercase; }
     .support-copy { color: var(--graphite); font-size: 13px; }
     .alternative { align-items: center; border: 1px solid var(--border); border-radius: 12px; display: flex; gap: 24px; justify-content: space-between; padding: 20px 22px; }
@@ -232,8 +243,6 @@
       main { padding-top: 24px; }
       .hero { padding-bottom: 28px; }
       h1 { letter-spacing: -1px; }
-      .installer-grid { grid-template-columns: minmax(0, 1fr); }
-      .card-main { flex-basis: auto; min-height: 245px; }
       .behavior-grid { grid-template-columns: 1fr; }
     }
 
@@ -374,7 +383,7 @@
           var command = button.getAttribute('data-copy');
           if (!navigator.clipboard) return;
           navigator.clipboard.writeText(command).then(function () {
-            button.textContent = 'copied ✓';
+            button.textContent = 'copied';
             button.classList.add('copied');
             window.setTimeout(function () {
               button.textContent = 'copy';
