@@ -58,6 +58,7 @@ OPT_QUIET=0
 [ -n "${ATOMSCAN_NO_TOOLS:-}" ] && OPT_TOOLS=0
 
 # Filled in as we go; declared here so the shape of the script is visible.
+HOST_OS=""      # uname -s; detect_platform sets it, everything else reads it
 SELF=""         # this machine's target triple, published or not
 TARGET=""       # same, but empty unless a release actually carries it
 PLATFORM=""     # human-readable platform description
@@ -113,6 +114,15 @@ sudo (in that preference order).
 EOF
 }
 
+# valid_version STRING — true for a release identifier we are willing to place
+# in a URL or a filesystem path. Applied to resolved tags as well as typed ones:
+# a tag arrives from the network and has earned no more trust than an argument.
+valid_version() {
+	case $1 in
+	'' | *[!0-9A-Za-z._+-]*) return 1 ;;
+	esac
+}
+
 parse_args() {
 	while [ $# -gt 0 ]; do
 		case $1 in
@@ -135,9 +145,9 @@ parse_args() {
 	*) die "--method must be auto, binary, brew, or source (got '$OPT_METHOD')" ;;
 	esac
 	OPT_VERSION=${OPT_VERSION#v}
-	case $OPT_VERSION in
-	*[!0-9A-Za-z._+-]*) die "invalid version '$OPT_VERSION'" ;;
-	esac
+	if [ -n "$OPT_VERSION" ]; then
+		valid_version "$OPT_VERSION" || die "invalid version '$OPT_VERSION'"
+	fi
 }
 
 # ---------------------------------------------------------------------------
@@ -235,16 +245,17 @@ banner() {
 cleanup() {
 	[ -n "$TMP" ] && rm -rf "$TMP"
 	if [ -n "$INSTALL_TMP" ]; then
-		if [ "$INSTALL_PRIVILEGED" = 1 ] && [ -n "$INSTALL_ESCALATOR" ]; then
-			"$INSTALL_ESCALATOR" rm -f "$INSTALL_TMP" 2>/dev/null || :
-		else
-			rm -f "$INSTALL_TMP" 2>/dev/null || :
-		fi
+		install_run rm -f "$INSTALL_TMP" 2>/dev/null || :
 	fi
 	[ -n "$SOURCE_STAGE" ] && rm -rf "$SOURCE_STAGE"
 	if [ -n "$SOURCE_OLD" ]; then
 		if [ -n "$SOURCE_DEST" ] && [ ! -e "$SOURCE_DEST" ] && [ ! -L "$SOURCE_DEST" ]; then
+			# Interrupted mid-swap: put the previous checkout back.
 			mv "$SOURCE_OLD" "$SOURCE_DEST" 2>/dev/null || :
+		else
+			# The new checkout is already in place, so this one is only taking
+			# up several gigabytes of somebody's cache directory.
+			rm -rf "$SOURCE_OLD" 2>/dev/null || :
 		fi
 	fi
 	return 0
@@ -262,8 +273,10 @@ make_tmpdir() {
 # Platform
 # ---------------------------------------------------------------------------
 
+# Also the one place `uname -s` is read: everything downstream consults HOST_OS,
+# so the whole run agrees on one answer and spends one fork getting it.
 detect_platform() {
-	dp_os=$(uname -s 2>/dev/null || echo unknown)
+	HOST_OS=$(uname -s 2>/dev/null || echo unknown)
 	dp_arch=$(uname -m 2>/dev/null || echo unknown)
 	dp_desc=""
 
@@ -278,7 +291,7 @@ detect_platform() {
 	ppc64le | powerpc64le) dp_arch=powerpc64le ;;
 	esac
 
-	case $dp_os in
+	case $HOST_OS in
 	Linux)
 		dp_operating=$(uname -o 2>/dev/null || :)
 		dp_libc=gnu
@@ -336,8 +349,8 @@ detect_platform() {
    irm https://install.atomdrift.org/scan.ps1 | iex"
 		;;
 	*)
-		SELF="$dp_arch-unknown-$(printf '%s' "$dp_os" | tr '[:upper:]' '[:lower:]')"
-		dp_desc="$dp_os $(uname -r 2>/dev/null || :)"
+		SELF="$dp_arch-unknown-$(printf '%s' "$HOST_OS" | tr '[:upper:]' '[:lower:]')"
+		dp_desc="$HOST_OS $(uname -r 2>/dev/null || :)"
 		;;
 	esac
 
@@ -426,14 +439,16 @@ resolve_latest() {
 	esac
 	case $rl_final in
 	*/releases/tag/*)
-		printf '%s' "${rl_final##*/tag/}"
+		rl_tag=${rl_final##*/tag/}
+		valid_version "$rl_tag" || return 1
+		printf '%s' "$rl_tag"
 		return 0
 		;;
 	esac
 
 	http_get "https://api.github.com/repos/$REPO/releases/latest" "$TMP/latest.json" 2>/dev/null || return 1
 	rl_tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$TMP/latest.json" | head -n 1)
-	[ -n "$rl_tag" ] || return 1
+	valid_version "$rl_tag" || return 1
 	printf '%s' "$rl_tag"
 }
 
@@ -569,6 +584,17 @@ find_escalator() {
 	return 1
 }
 
+# install_run COMMAND... — run one step of a write into INSTALL_DIR, escalated
+# when that directory needs it. install_binary_file and the exit trap both write
+# there, and this is the single place that decides how.
+install_run() {
+	if [ "$INSTALL_PRIVILEGED" = 1 ] && [ -n "$INSTALL_ESCALATOR" ]; then
+		"$INSTALL_ESCALATOR" "$@"
+	else
+		"$@"
+	fi
+}
+
 quote_arg() {
 	qa_escaped=$(printf '%s' "$1" | sed "s/'/'\\\\''/g")
 	printf "'%s'" "$qa_escaped"
@@ -675,8 +701,7 @@ native_path_dirs() {
 use_native_path_dir() {
 	unpd_privilege=${1:-1}
 	unpd_require_path=${2:-1}
-	unpd_os=$(uname -s 2>/dev/null || echo unknown)
-	unpd_dirs=$(native_path_dirs "$unpd_os")
+	unpd_dirs=$(native_path_dirs "$HOST_OS")
 	for unpd_dir in $unpd_dirs; do
 		if [ "$unpd_require_path" = 1 ]; then on_path "$unpd_dir" || continue; fi
 		managed_path_dir "$unpd_dir" && continue
@@ -687,28 +712,24 @@ use_native_path_dir() {
 	return 1
 }
 
-# Follow PATH order without word-splitting directory names. Relative and empty
-# entries are unsafe escalation targets. Native local directories were already
-# attempted above; core directories such as /usr/bin are reached only here.
+# Follow PATH order without word-splitting directory names. Native local
+# directories were already attempted above; core directories such as /usr/bin
+# are reached only here.
+#
+# The trailing colon means every entry is followed by one, so each pass consumes
+# exactly one and the loop ends when nothing is left. Consuming before any test
+# is what keeps `continue` safe to write here.
 use_any_path_dir() {
 	uap_privilege=${1:-1}
-	uap_rest=$PATH
-	while :; do
-		case $uap_rest in
-		*:*) uap_dir=${uap_rest%%:*}; uap_rest=${uap_rest#*:}; uap_last=0 ;;
-		*) uap_dir=$uap_rest; uap_last=1 ;;
-		esac
+	uap_rest="$PATH:"
+	while [ -n "$uap_rest" ]; do
+		uap_dir=${uap_rest%%:*}
+		uap_rest=${uap_rest#*:}
 
-		case $uap_dir in
-		/*)
-			managed_path_dir "$uap_dir" || {
-				if use_install_dir "$uap_dir" "$uap_privilege"; then
-					return 0
-				fi
-			}
-			;;
-		esac
-		[ "$uap_last" = 1 ] && break
+		# Relative and empty entries are unsafe escalation targets.
+		case $uap_dir in /*) ;; *) continue ;; esac
+		managed_path_dir "$uap_dir" && continue
+		use_install_dir "$uap_dir" "$uap_privilege" && return 0
 	done
 	return 1
 }
@@ -748,8 +769,7 @@ use_current_if_exact() {
 		if [ -n "$BREW_PREFIX" ] && [ "${ucie_dir#"$BREW_PREFIX"}" != "$ucie_dir" ]; then
 			return 1
 		fi
-		ucie_os=$(uname -s 2>/dev/null || echo unknown)
-		if [ "$ucie_os" != Linux ]; then
+		if [ "$HOST_OS" != Linux ]; then
 			case $ucie_dir in /bin | /sbin | /usr/bin | /usr/sbin) return 1 ;; esac
 		fi
 	fi
@@ -763,7 +783,6 @@ use_current_if_exact() {
 resolve_install_dir() {
 	INSTALL_PRIVILEGED=0
 	INSTALL_ESCALATOR=""
-	rid_os=$(uname -s 2>/dev/null || echo unknown)
 	if [ -n "$OPT_DIR" ]; then
 		if use_install_dir "$OPT_DIR"; then
 			return 0
@@ -785,7 +804,7 @@ resolve_install_dir() {
 		# Linux distributions may legitimately own /usr/bin installs. On the
 		# other Unix families, migrate toward the native local/application prefix
 		# instead of perpetuating an old system-directory choice.
-		if [ "$rid_os" != Linux ]; then
+		if [ "$HOST_OS" != Linux ]; then
 			case $rid_dir in /bin | /sbin | /usr/bin | /usr/sbin) rid_system_core=1 ;; esac
 		fi
 		if [ "$rid_brewed" = 0 ] && [ "$rid_system_core" = 0 ]; then
@@ -798,8 +817,11 @@ resolve_install_dir() {
 	fi
 
 	# A PATH entry wins even when its directory has not been created yet. This
+	# keeps a first install where the user already said they want binaries,
+	# instead of escalating to a system directory just because ~/.local/bin
+	# happens not to exist yet.
 	if [ -n "${HOME:-}" ]; then
-		if [ "$(uname -s 2>/dev/null || :)" = Haiku ]; then
+		if [ "$HOST_OS" = Haiku ]; then
 			rid_haiku="$HOME/config/non-packaged/bin"
 			if on_path "$rid_haiku" && mkdir -p "$rid_haiku" 2>/dev/null && writable_dir "$rid_haiku"; then
 				INSTALL_DIR=$rid_haiku
@@ -820,7 +842,7 @@ resolve_install_dir() {
 
 	# Linux honors PATH throughout. Elsewhere, prefer the native application
 	# prefix even when it needs PATH advice; never fall through to /usr/bin.
-	if [ "$rid_os" = Linux ]; then
+	if [ "$HOST_OS" = Linux ]; then
 		use_native_path_dir 0 1 && return 0
 		use_any_path_dir 0 && return 0
 		use_native_path_dir 1 1 && return 0
@@ -834,94 +856,72 @@ resolve_install_dir() {
    Add \$HOME/.local/bin or \$HOME/bin to PATH, or choose one with --dir."
 }
 
-# install_binary_file SRC — install SRC with mode 0755.
+# ibf_fail MESSAGE — die without leaving a staging file behind. Reads ibf_tmp,
+# which install_binary_file sets: shell has no locals, so the shared ibf_ prefix
+# is the convention marking who owns the variable.
+ibf_fail() {
+	install_run rm -f "$ibf_tmp" 2>/dev/null || :
+	die "$1"
+}
+
+# ibf_approve COMMAND [LABEL] — clear a privileged command with the user, or
+# die. Approval given earlier in this run is not asked for again, but every
+# privileged command is still printed before it runs. LABEL stands in for the
+# progress line when COMMAND is a chain too long to echo in full.
+ibf_approve() {
+	if [ "$PRIVILEGE_APPROVED" = 1 ]; then
+		step privilege "${2:-$1}"
+		return 0
+	fi
+	gap
+	approve_privilege "$1" || die "permission is required to install $ibf_dest"
+}
+
+# install_binary_file SRC — install SRC at INSTALL_DIR/BIN with mode 0755.
 #
-# BSD and macOS use their native atomic install modes. GNU/Linux deliberately
-# favors one straightforward install operation. Other systems retain the
-# portable same-directory staging and rename fallback.
+# Whichever route is taken, an interrupted install leaves either the old binary
+# or the new one in place, never a partial file.
 install_binary_file() {
 	ibf_dest="$INSTALL_DIR/$BIN"
 	ibf_tmp="$INSTALL_DIR/.$BIN.new.$$"
+	# Names the escalator in a diagnostic, and is empty when there is not one.
+	ibf_via=""
+
 	if [ "$INSTALL_PRIVILEGED" = 1 ]; then
-		# The BSD install tools can perform the same-directory temporary copy and
-		# atomic rename themselves. Their safe-copy flags unfortunately differ.
-		ibf_install_flag=""
-		ibf_os=$(uname -s 2>/dev/null || :)
-		case $ibf_os in
-		Darwin | FreeBSD | OpenBSD) ibf_install_flag=-S ;;
-		NetBSD) ibf_install_flag=-r ;;
+		ibf_via=" with $INSTALL_ESCALATOR"
+
+		# BSD and macOS install(1) do the same-directory copy and atomic rename
+		# themselves; only the flag that asks for it differs. GNU install has no
+		# such mode, but one direct operation still beats staging by hand, so
+		# Linux uses it flagless. BusyBox and toybox systems, which may have no
+		# install applet at all, fall through to the staging path below.
+		ibf_flag=""
+		case $HOST_OS in
+		Darwin | FreeBSD | OpenBSD) ibf_flag=-S ;;
+		NetBSD) ibf_flag=-r ;;
 		esac
-		if [ -n "$ibf_install_flag" ] && command -v install >/dev/null 2>&1; then
-			ibf_display="$INSTALL_ESCALATOR install $ibf_install_flag -m 755 $(quote_arg "$1") $(quote_arg "$ibf_dest")"
-			if [ "$PRIVILEGE_APPROVED" = 1 ]; then
-				step privilege "$ibf_display"
-			else
-				gap
-				approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
-			fi
-			"$INSTALL_ESCALATOR" install "$ibf_install_flag" -m 755 "$1" "$ibf_dest" ||
-				die "cannot install $ibf_dest with $INSTALL_ESCALATOR"
+		if { [ -n "$ibf_flag" ] || [ "$HOST_OS" = Linux ] || [ "$HOST_OS" = GNU ]; } &&
+			command -v install >/dev/null 2>&1; then
+			ibf_approve "$INSTALL_ESCALATOR install${ibf_flag:+ $ibf_flag} -m 755 $(quote_arg "$1") $(quote_arg "$ibf_dest")"
+			install_run install ${ibf_flag:+"$ibf_flag"} -m 755 "$1" "$ibf_dest" ||
+				die "cannot install $ibf_dest$ibf_via"
 			INSTALLED=$ibf_dest
 			CHANGED=1
 			return 0
 		fi
 
-		# GNU install has no atomic-replacement mode. Prefer its simple direct
-		# operation; BusyBox/toybox systems fall back when the applet is absent.
-		case $ibf_os in
-		Linux | GNU)
-			if command -v install >/dev/null 2>&1; then
-				ibf_display="$INSTALL_ESCALATOR install -m 755 $(quote_arg "$1") $(quote_arg "$ibf_dest")"
-				if [ "$PRIVILEGE_APPROVED" = 1 ]; then
-					step privilege "$ibf_display"
-				else
-					gap
-					approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
-				fi
-				"$INSTALL_ESCALATOR" install -m 755 "$1" "$ibf_dest" ||
-					die "cannot install $ibf_dest with $INSTALL_ESCALATOR"
-				INSTALLED=$ibf_dest
-				CHANGED=1
-				return 0
-			fi
-			;;
-		esac
-
-		ibf_display="$INSTALL_ESCALATOR cp $(quote_arg "$1") $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR chmod 755 $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR mv -f $(quote_arg "$ibf_tmp") $(quote_arg "$ibf_dest")"
-		if [ "$PRIVILEGE_APPROVED" = 1 ]; then
-			step privilege "$INSTALL_ESCALATOR  ${C_DIM}(atomic binary install)${C_RESET}"
-		else
-			gap
-			approve_privilege "$ibf_display" || die "permission is required to install $ibf_dest"
-		fi
-		INSTALL_TMP=$ibf_tmp
-		"$INSTALL_ESCALATOR" cp "$1" "$ibf_tmp" || {
-			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
-			die "cannot write to $INSTALL_DIR with $INSTALL_ESCALATOR"
-		}
-		"$INSTALL_ESCALATOR" chmod 755 "$ibf_tmp" || {
-			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
-			die "cannot make $ibf_tmp executable"
-		}
-		"$INSTALL_ESCALATOR" mv -f "$ibf_tmp" "$ibf_dest" || {
-			"$INSTALL_ESCALATOR" rm -f "$ibf_tmp" 2>/dev/null || :
-			die "cannot replace $ibf_dest with $INSTALL_ESCALATOR"
-		}
-	else
-		INSTALL_TMP=$ibf_tmp
-		cp "$1" "$ibf_tmp" || {
-			rm -f "$ibf_tmp" 2>/dev/null || :
-			die "cannot write to $INSTALL_DIR"
-		}
-		chmod 755 "$ibf_tmp" || {
-			rm -f "$ibf_tmp" 2>/dev/null || :
-			die "cannot make $ibf_tmp executable"
-		}
-		mv -f "$ibf_tmp" "$ibf_dest" || {
-			rm -f "$ibf_tmp"
-			die "cannot replace $ibf_dest"
-		}
+		ibf_approve \
+			"$INSTALL_ESCALATOR cp $(quote_arg "$1") $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR chmod 755 $(quote_arg "$ibf_tmp") && $INSTALL_ESCALATOR mv -f $(quote_arg "$ibf_tmp") $(quote_arg "$ibf_dest")" \
+			"$INSTALL_ESCALATOR  ${C_DIM}(atomic binary install)${C_RESET}"
 	fi
+
+	# Stage inside the destination directory so the rename that follows stays on
+	# one filesystem, where it is atomic.
+	INSTALL_TMP=$ibf_tmp
+	install_run cp "$1" "$ibf_tmp" || ibf_fail "cannot write to $INSTALL_DIR$ibf_via"
+	install_run chmod 755 "$ibf_tmp" || ibf_fail "cannot make $ibf_tmp executable"
+	install_run mv -f "$ibf_tmp" "$ibf_dest" || ibf_fail "cannot replace $ibf_dest$ibf_via"
+
 	INSTALL_TMP=""
 	INSTALLED=$ibf_dest
 	CHANGED=1
@@ -935,8 +935,38 @@ install_binary_file() {
 # leave `--method binary` one flag away.
 # ---------------------------------------------------------------------------
 
+# Homebrew installs to a fixed prefix and leaves exporting it to a profile
+# snippet, which a non-login `curl | sh` never reads. Look in the three prefixes
+# it uses before concluding there is no Homebrew: on an image-based system like
+# Bluefin, an unseen Homebrew would demote us to rpm-ostree, which cannot
+# install anything without a reboot. The prefix is appended rather than
+# prepended — brew itself is all we are missing, and every other tool this run
+# already resolved should keep the priority it had.
 brew_works() {
+	if ! command -v brew >/dev/null 2>&1; then
+		for bw_dir in /opt/homebrew/bin /home/linuxbrew/.linuxbrew/bin "${HOME:-}/.linuxbrew/bin"; do
+			[ -x "$bw_dir/brew" ] || continue
+			PATH="$PATH:$bw_dir"
+			export PATH
+			break
+		done
+	fi
 	command -v brew >/dev/null 2>&1 && brew --version >/dev/null 2>&1
+}
+
+# Resolve Homebrew's root into BREW_PREFIX, empty when there is no Homebrew.
+#
+# The order here is the whole point, which is why it is a function and not two
+# lines in main: brew_works is what puts an unexported Homebrew back on PATH, so
+# reading the prefix first would report "no Homebrew" on exactly the machines
+# that repair exists for. An empty BREW_PREFIX then stops managed_path_dir from
+# recognising Homebrew's directories — the very directories the repair has just
+# added to PATH, and so to the list of places we might install.
+find_brew_prefix() {
+	BREW_PREFIX=""
+	brew_works || return 1
+	BREW_PREFIX=$(brew --prefix 2>/dev/null || :)
+	[ -n "$BREW_PREFIX" ]
 }
 
 trust_brew_formulae() {
@@ -950,7 +980,7 @@ trust_brew_formulae() {
 }
 
 auto_method() {
-	case "$(uname -s 2>/dev/null || :)" in
+	case $HOST_OS in
 	Darwin | Linux)
 		if brew_works && [ -z "$OPT_DIR" ] && [ -z "$OPT_VERSION" ]; then
 			printf '%s\n' brew
@@ -1098,9 +1128,9 @@ install_binary() {
 rust_hint() {
 	if command -v rustup >/dev/null 2>&1; then
 		printf 'rustup update stable'
-	elif [ "$(uname -s)" = Darwin ] && brew_works; then
+	elif [ "$HOST_OS" = Darwin ] && brew_works; then
 		if command -v rustc >/dev/null 2>&1; then printf 'brew upgrade rust'; else printf 'brew install rust'; fi
-	elif [ "$(uname -s)" = FreeBSD ] && command -v pkg >/dev/null 2>&1; then
+	elif [ "$HOST_OS" = FreeBSD ] && command -v pkg >/dev/null 2>&1; then
 		if command -v rustc >/dev/null 2>&1; then printf 'pkg upgrade rust'; else printf 'pkg install rust'; fi
 	else
 		printf "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
@@ -1188,7 +1218,12 @@ install_source() {
 		return 0
 	fi
 
-	is_src="${XDG_CACHE_HOME:-$HOME/.cache}/atomdrift/scan"
+	# Guarded because a service manager or `env -i` can leave HOME unset, and
+	# under `set -u` a bare $HOME would abort with a shell error rather than
+	# something a reader could act on.
+	is_cache=${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}
+	[ -n "$is_cache" ] || die "a source build needs a cache directory; set HOME or XDG_CACHE_HOME"
+	is_src="$is_cache/atomdrift/scan"
 	mkdir -p "$(dirname "$is_src")" || die "cannot create $(dirname "$is_src")"
 
 	# The analysis stack is large; the target directory wants about 10 GB.
@@ -1283,7 +1318,7 @@ install_source() {
 	(cd "$is_src" && cargo build --release --locked --bin "$BIN") || die "build failed in $is_src"
 	is_built="$is_src/target/release/$BIN"
 	[ -f "$is_built" ] || die "the build produced no $BIN"
-	if [ "$(uname -s)" = Darwin ] && command -v codesign >/dev/null 2>&1; then
+	if [ "$HOST_OS" = Darwin ] && command -v codesign >/dev/null 2>&1; then
 		codesign --force --sign - "$is_built" >/dev/null || die "cannot sign the newly built $BIN"
 	fi
 	"$is_built" --version >/dev/null 2>&1 || die "the newly built $BIN does not run"
@@ -1307,34 +1342,51 @@ have_tool() {
 	return 1
 }
 
+# emerge and rpm-ostree are detected but never run — see install_tool_packages.
+# They earn their place here anyway: knowing the manager is what lets us name
+# packages the machine can actually resolve.
 detect_pkg_manager() {
 	PM="" PM_INSTALL=""
 	if brew_works; then
 		PM=brew PM_INSTALL="brew install"
 		return 0
 	fi
-	pm_os=$(uname -s 2>/dev/null || echo unknown)
-	for pm_c in apt-get dnf pacman zypper apk pkg pkgin pkg_add; do
+	# rpm-ostree comes before dnf: an image-based system may carry both, but its
+	# /usr is read-only, so dnf is the wrong half of the pair to reach for.
+	for pm_c in rpm-ostree apt-get dnf yum pacman zypper apk xbps-install emerge pkg pkgin pkg_add port; do
 		command -v "$pm_c" >/dev/null 2>&1 || continue
 		case $pm_c in
+		rpm-ostree) PM=rpm-ostree PM_INSTALL="rpm-ostree install" ;;
 		apt-get) PM=apt PM_INSTALL="apt-get install -y" ;;
 		dnf) PM=dnf PM_INSTALL="dnf install -y" ;;
+		yum) PM=yum PM_INSTALL="yum install -y" ;;
 		pacman) PM=pacman PM_INSTALL="pacman -S --noconfirm --needed" ;;
 		zypper) PM=zypper PM_INSTALL="zypper --non-interactive install" ;;
 		apk) PM=apk PM_INSTALL="apk add" ;;
+		xbps-install) PM=xbps PM_INSTALL="xbps-install -Sy" ;;
+		emerge) PM=emerge PM_INSTALL="emerge" ;;
 		pkg)
 			# Solaris/illumos `pkg` is IPS, not FreeBSD pkg(8); its package
 			# names and flags are unrelated. Prefer pkgsrc's pkgin when present.
-			case $pm_os in FreeBSD | DragonFly) PM=pkg PM_INSTALL="pkg install -y" ;; *) continue ;; esac
+			case $HOST_OS in FreeBSD | DragonFly) PM=pkg PM_INSTALL="pkg install -y" ;; *) continue ;; esac
 			;;
 		pkgin) PM=pkgin PM_INSTALL="pkgin -y install" ;;
-		pkg_add) PM=pkg_add PM_INSTALL="pkg_add" ;;
+		pkg_add)
+			# OpenBSD pkg_add. NetBSD ships the same command name from a
+			# different pkg_install: there `pkg_info -Q` prints a build variable
+			# instead of searching, and pkg_add needs a hand-set PKG_PATH — so
+			# pkgin, checked just above, is NetBSD's supported route.
+			case $HOST_OS in OpenBSD) PM=pkg_add PM_INSTALL="pkg_add" ;; *) continue ;; esac
+			;;
+		port)
+			# MacPorts, reached only when there is no Homebrew. Guarded because
+			# `port` is a common enough name elsewhere.
+			case $HOST_OS in Darwin) PM=port PM_INSTALL="port install" ;; *) continue ;; esac
+			;;
 		esac
 		break
 	done
-	[ -n "$PM" ] || return 1
-
-	return 0
+	[ -n "$PM" ]
 }
 
 # True only when the configured repositories currently advertise PACKAGE.
@@ -1345,12 +1397,23 @@ package_available() {
 	brew) brew info --formula "$pa_pkg" >/dev/null 2>&1 ;;
 	apt) apt-cache show "$pa_pkg" >/dev/null 2>&1 ;;
 	dnf) dnf --quiet info "$pa_pkg" >/dev/null 2>&1 ;;
+	yum) yum --quiet info "$pa_pkg" >/dev/null 2>&1 ;;
+	# `rpm-ostree search` prints "name : summary" under a matched-by heading,
+	# and only from 2023.6 onward. An older build prints nothing we match, which
+	# lands on the same conservative answer as a package that is not there.
+	rpm-ostree) rpm-ostree search "$pa_pkg" 2>/dev/null | grep -q "^${pa_pkg} : " ;;
 	pacman) pacman -Si "$pa_pkg" >/dev/null 2>&1 ;;
 	zypper) zypper --non-interactive info "$pa_pkg" >/dev/null 2>&1 ;;
 	apk) apk search -e "$pa_pkg" 2>/dev/null | grep -q "^${pa_pkg}-[0-9]" ;;
+	xbps) xbps-query -R --property=pkgver "$pa_pkg" 2>/dev/null | grep -q "^${pa_pkg}-[0-9]" ;;
+	# portageq is part of portage itself, so it is there whenever emerge is. It
+	# prints the best visible atom, e.g. app-arch/upx-4.2.4.
+	emerge) portageq best_visible / "$pa_pkg" 2>/dev/null | grep -q "^${pa_pkg}-[0-9]" ;;
 	pkg) pkg search -q -x "^${pa_pkg}-[0-9]" 2>/dev/null | grep -q . ;;
 	pkgin) pkgin -n search "^${pa_pkg}-[0-9]" 2>/dev/null | grep -q "^${pa_pkg}-" ;;
 	pkg_add) pkg_info -Q "$pa_pkg" 2>/dev/null | grep -q "^${pa_pkg}-" ;;
+	# --index answers from the local port index, so this stays offline and fast.
+	port) port -q info --index --name "$pa_pkg" >/dev/null 2>&1 ;;
 	*) return 1 ;;
 	esac
 }
@@ -1358,19 +1421,25 @@ package_available() {
 # pkg_names TOOL — preferred packages that can provide TOOL under the detected
 # manager. The first one advertised by the active repositories wins.
 pkg_names() {
+	[ -n "$PM" ] || return 1
 	case "$PM:$1" in
-	brew:rizin | apt:rizin | dnf:rizin | pacman:rizin | pkg:rizin) printf 'rizin radare2' ;;
-	zypper:rizin | apk:rizin | pkgin:rizin | pkg_add:rizin) printf radare2 ;;
-	brew:upx | dnf:upx | pacman:upx | zypper:upx | apk:upx | pkg:upx | pkgin:upx | pkg_add:upx) printf upx ;;
+	# Rizin, falling back to radare2 on the trees that never picked rizin up.
+	zypper:rizin | pkgin:rizin) printf radare2 ;;
+	emerge:rizin) printf 'dev-util/rizin dev-util/radare2' ;;
+	*:rizin) printf 'rizin radare2' ;;
 	apt:upx) printf upx-ucl ;;
+	emerge:upx) printf app-arch/upx ;;
+	*:upx) printf upx ;;
 	# Upstream 7-Zip (`7zz`) first, p7zip (`7z`) as fallback: p7zip is a fork of
 	# 7-Zip 16.02 with no APFS handler, so .dmg contents go unscanned. Listing
 	# both is safe — the caller takes the first name the repos advertise.
 	brew:7z) printf sevenzip ;;
 	apt:7z) printf '7zip p7zip-full' ;;
-	dnf:7z | pacman:7z | zypper:7z | apk:7z | pkgin:7z | pkg_add:7z) printf '7zip p7zip' ;;
 	pkg:7z) printf '7-zip p7zip' ;;
-	brew:innoextract | apt:innoextract | dnf:innoextract | pacman:innoextract | zypper:innoextract | pkg:innoextract) printf innoextract ;;
+	emerge:7z) printf 'app-arch/7zip app-arch/p7zip' ;;
+	*:7z) printf '7zip p7zip' ;;
+	emerge:innoextract) printf app-arch/innoextract ;;
+	*:innoextract) printf innoextract ;;
 	*) : ;;
 	esac
 }
@@ -1378,47 +1447,42 @@ pkg_names() {
 install_tool_packages() {
 	[ "$#" -gt 0 ] || return 0
 	itp_display="$PM_INSTALL $*"
+
+	# Two managers we detect but never drive: Portage would build every package
+	# from source, and rpm-ostree only stages an image the next boot picks up.
+	# Name the command and let the reader choose the moment.
 	case $PM in
-	brew)
-		step tools "$itp_display"
-		brew install "$@"
+	emerge)
+		note "these build from source; run when you have the time:  $itp_display"
+		return 1
 		;;
-	*)
-		if [ "$(id -u)" = 0 ]; then
-			step tools "$itp_display"
-			case $PM in
-			apt) apt-get install -y "$@" ;;
-			dnf) dnf install -y "$@" ;;
-			pacman) pacman -S --noconfirm --needed "$@" ;;
-			zypper) zypper --non-interactive install "$@" ;;
-			apk) apk add "$@" ;;
-			pkg) pkg install -y "$@" ;;
-			pkgin) pkgin -y install "$@" ;;
-			pkg_add) pkg_add "$@" ;;
-			esac
-		else
-			[ -n "$INSTALL_ESCALATOR" ] || find_escalator || {
-				note "available tools not installed:  $itp_display"
-				return 1
-			}
-			itp_display="$INSTALL_ESCALATOR $itp_display"
-			approve_privilege "$itp_display" || {
-				note "tools skipped; run later:  $itp_display"
-				return 1
-			}
-			case $PM in
-			apt) "$INSTALL_ESCALATOR" apt-get install -y "$@" ;;
-			dnf) "$INSTALL_ESCALATOR" dnf install -y "$@" ;;
-			pacman) "$INSTALL_ESCALATOR" pacman -S --noconfirm --needed "$@" ;;
-			zypper) "$INSTALL_ESCALATOR" zypper --non-interactive install "$@" ;;
-			apk) "$INSTALL_ESCALATOR" apk add "$@" ;;
-			pkg) "$INSTALL_ESCALATOR" pkg install -y "$@" ;;
-			pkgin) "$INSTALL_ESCALATOR" pkgin -y install "$@" ;;
-			pkg_add) "$INSTALL_ESCALATOR" pkg_add "$@" ;;
-			esac
-		fi
+	rpm-ostree)
+		note "these need a reboot to take effect:  $itp_display"
+		return 1
 		;;
 	esac
+
+	# Homebrew installs under its own prefix and refuses to run as root. Every
+	# other manager writes to system paths we may not already hold.
+	itp_sudo=""
+	if [ "$PM" != brew ] && [ "$(id -u)" != 0 ]; then
+		[ -n "$INSTALL_ESCALATOR" ] || find_escalator || {
+			note "available tools not installed:  $itp_display"
+			return 1
+		}
+		itp_sudo=$INSTALL_ESCALATOR
+		itp_display="$itp_sudo $itp_display"
+		approve_privilege "$itp_display" || {
+			note "tools skipped; run later:  $itp_display"
+			return 1
+		}
+	fi
+
+	step tools "$itp_display"
+	# Deliberately unquoted: PM_INSTALL is a fixed command line chosen above,
+	# and an empty itp_sudo has to vanish rather than become an argument.
+	# shellcheck disable=SC2086 # installer-owned words, as are the package names.
+	$itp_sudo $PM_INSTALL "$@"
 }
 
 check_tools() {
@@ -1469,7 +1533,13 @@ check_tools() {
 		step tools "core scanner ready"
 	fi
 	if [ -n "$ct_unavailable" ]; then
-		note "not available from configured repositories:${ct_unavailable}"
+		# Only claim the repositories were consulted when there was something to
+		# consult; with no package manager we never asked anyone anything.
+		if [ -n "$PM" ]; then
+			note "not available from configured repositories:${ct_unavailable}"
+		else
+			note "no package manager found, so these went unchecked:${ct_unavailable}"
+		fi
 	fi
 	if [ -n "$ct_not_installed" ]; then
 		note "available, but not installed:${ct_not_installed}"
@@ -1481,7 +1551,7 @@ check_tools() {
 # nothing else would mention it — but without an APFS handler a .dmg yields one
 # opaque blob and its contents go unscanned.
 seven_zip_advice() {
-	[ "$(uname -s)" = Windows_NT ] && return 0
+	[ "$HOST_OS" = Windows_NT ] && return 0
 	have_tool 7zz && return 0
 	have_tool 7z || return 0
 
@@ -1505,7 +1575,7 @@ path_advice() {
 	fish) note "fish_add_path $pa_dir" ;;
 	zsh) note "echo 'export PATH=\"$pa_dir:\$PATH\"' >> ~/.zshrc" ;;
 	bash)
-		if [ "$(uname -s)" = Darwin ]; then
+		if [ "$HOST_OS" = Darwin ]; then
 			note "echo 'export PATH=\"$pa_dir:\$PATH\"' >> ~/.bash_profile"
 		else
 			note "echo 'export PATH=\"$pa_dir:\$PATH\"' >> ~/.bashrc"
@@ -1557,7 +1627,7 @@ main() {
 	detect_platform
 	step platform "$PLATFORM"
 
-	BREW_PREFIX=$(brew --prefix 2>/dev/null || :)
+	find_brew_prefix || :
 
 	# Homebrew is the right owner of a macOS or Linux install when it is there:
 	# it holds upgrades, PATH, and the rizin and upx dependencies. It cannot

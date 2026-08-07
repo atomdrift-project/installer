@@ -38,7 +38,8 @@ current_install() { return 1; }
 printf 'ok - OS-native install directory preferences\n'
 
 # Keep generic PATH-selection cases deterministic on BSD/macOS runners too.
-uname() { printf '%s\n' Linux; }
+# detect_platform normally sets HOST_OS; these cases call its consumers directly.
+HOST_OS=Linux
 
 HOME=$test_home
 OPT_DIR=""
@@ -160,7 +161,7 @@ check_native_atomic_install() (
 	nai_os=$1 nai_flag=$2
 	nai_dir="$TMP/$nai_os-system/bin"
 	command mkdir -p "$nai_dir"
-	uname() { printf '%s\n' "$nai_os"; }
+	HOST_OS=$nai_os
 	# shellcheck disable=SC2329 # Invoked indirectly through INSTALL_ESCALATOR.
 	doas() {
 		[ "$1" = install ] || fail "unexpected $nai_os privileged command: $*"
@@ -190,7 +191,7 @@ printf 'ok - BSD and macOS use one native atomic install operation\n'
 # Mock directory preparation so this checks policy without touching host paths.
 check_legacy_migration() (
 	clm_os=$1 clm_expected=$2
-	uname() { printf '%s\n' "$clm_os"; }
+	HOST_OS=$clm_os
 	current_install() { printf '%s\n' /usr/bin/atomscan; }
 	writable_dir() { return 0; }
 	use_install_dir() { INSTALL_DIR=$1; return 0; }

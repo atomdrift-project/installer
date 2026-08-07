@@ -48,18 +48,42 @@ setup_style
 OPT_QUIET=1
 [ "$TAP" = atomdrift-project/tap ] || fail "unexpected tap namespace: $TAP"
 
-uname() {
-	printf '%s\n' "$test_os"
-}
+# Homebrew that is installed but not exported — a non-login `curl | sh` on an
+# image-based system — is put back on PATH by brew_works. find_brew_prefix has
+# to call it before reading the prefix: BREW_PREFIX is what stops the installer
+# writing into Homebrew's own directories behind its back, so an empty prefix on
+# a Homebrew machine is a silent hazard rather than a cosmetic gap.
+#
+# The mock refuses to report a prefix until the repair has run, so reading it in
+# the wrong order yields no prefix at all — which is exactly the bug.
+(
+	repaired=0
+	# shellcheck disable=SC2329 # Invoked indirectly through find_brew_prefix.
+	brew_works() {
+		repaired=1
+	}
+	# shellcheck disable=SC2329 # Invoked indirectly through find_brew_prefix.
+	brew() {
+		[ "${1:-}" = --prefix ] || return 1
+		[ "$repaired" = 1 ] || return 1
+		printf '%s\n' /opt/unexported-homebrew
+	}
+	BREW_PREFIX=""
+	find_brew_prefix || fail 'an unexported Homebrew was not resolved to a prefix'
+	[ "$BREW_PREFIX" = /opt/unexported-homebrew ] ||
+		fail "prefix resolved to '$BREW_PREFIX' instead of the repaired one"
+)
+printf 'ok - the Homebrew prefix is read after the PATH repair, not before\n'
 
+# auto_method reads HOST_OS, which detect_platform fills in on a real run.
 OPT_DIR=
 OPT_VERSION=
-for test_os in Darwin Linux; do
-	[ "$(auto_method)" = brew ] || fail "auto mode did not select Homebrew on $test_os"
+for HOST_OS in Darwin Linux; do
+	[ "$(auto_method)" = brew ] || fail "auto mode did not select Homebrew on $HOST_OS"
 done
-test_os=FreeBSD
+HOST_OS=FreeBSD
 [ "$(auto_method)" = binary ] || fail 'auto mode selected Homebrew on an unsupported OS'
-test_os=Linux
+HOST_OS=Linux
 OPT_DIR="$test_tmp/custom-bin"
 [ "$(auto_method)" = binary ] || fail 'a custom directory did not bypass Homebrew on Linux'
 OPT_DIR=

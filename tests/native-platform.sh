@@ -82,6 +82,7 @@ printf 'ok - native install and replacement\n'
 # partial file behind for later runs to trip over.
 if (
 	trap - 0
+	# shellcheck disable=SC2329 # Invoked indirectly through install_run.
 	chmod() { return 1; }
 	install_binary_file "$fixture_one" 2>/dev/null
 ); then

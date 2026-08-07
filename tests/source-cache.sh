@@ -87,7 +87,7 @@ EOF
 
 rustc() { printf 'rustc %s (test toolchain)\n' "$MOCK_RUST_VERSION"; }
 
-uname() { printf '%s\n' FreeBSD; }
+HOST_OS=FreeBSD
 installed_version() {
 	if [ -n "${MOCK_CURRENT:-}" ] && [ "$1" = "$MOCK_CURRENT" ]; then
 		printf '%s' 2.5.0
@@ -223,4 +223,28 @@ if (install_source 2>/dev/null); then
 fi
 
 printf 'ok - source cache clones safely, repairs corruption, and is reusable\n'
+
+# A service manager, a container, or `env -i` can leave HOME unset. The source
+# path needs somewhere to cache a checkout and must say so, rather than tripping
+# over an unbound variable and printing a shell diagnostic at the user.
+nohome_log="$fixture_root/nohome.log"
+OPT_VERSION=2.5.0
+VERSION=""
+OPT_FORCE=1
+unset -f resolve_latest
+if (
+	unset HOME XDG_CACHE_HOME
+	MOCK_CURRENT=""
+	INSTALL_DIR=""
+	install_source >"$nohome_log" 2>&1
+); then
+	fail 'a source build with no HOME or XDG_CACHE_HOME reported success'
+fi
+grep -q 'set HOME or XDG_CACHE_HOME' "$nohome_log" ||
+	fail "unset HOME produced no actionable message: $(cat "$nohome_log")"
+if grep -qi 'unbound\|parameter not set' "$nohome_log"; then
+	fail "unset HOME still reaches the shell as an unbound variable: $(cat "$nohome_log")"
+fi
+printf 'ok - a source build with no cache directory explains itself\n'
+
 rm -rf "$fixture_root"
