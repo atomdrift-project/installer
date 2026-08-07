@@ -20,7 +20,7 @@ assert_page_contains() {
 
 assert_page_contains 'curl -fsSL https://install.atomdrift.org/scan.sh | sh'
 assert_page_contains 'irm https://install.atomdrift.org/scan.ps1 | iex'
-assert_page_contains 'The open-source malware scanner that doesn’t suck.'
+assert_page_contains "The open-source malware scanner that doesn’t suck."
 assert_page_contains 'files, directories, archives, packages, URLs, and running processes'
 assert_page_contains 'No cloud scanner, API key, GPU, or sample upload required.'
 assert_page_contains 'Uses Homebrew when available'
@@ -30,6 +30,11 @@ assert_page_contains 'before replacing anything'
 assert_page_contains 'class="terminal terminal-windows"'
 assert_page_contains 'class="window-controls"'
 assert_page_contains 'class="command-target"'
+assert_page_contains 'x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE'
+
+if grep -F 'Linux binaries:' "$PAGE" >/dev/null; then
+	fail 'installer page still labels the shared architecture list as Linux-only'
+fi
 
 if grep -F 'atomdrift/tap' "$PAGE" >/dev/null; then
 	fail 'installer page still uses the legacy tap namespace'
@@ -39,7 +44,7 @@ for platform in macOS Linux BSD Solaris illumos Android Windows; do
 	assert_page_contains "$platform"
 done
 
-for unsupported in Haiku GhostBSD BlissOS GNU/Hurd; do
+for unsupported in DragonFly Haiku GhostBSD BlissOS GNU/Hurd; do
 	if grep -F "$unsupported" "$PAGE" >/dev/null; then
 		fail "installer page presents an experimental compatibility target: $unsupported"
 	fi

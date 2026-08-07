@@ -44,9 +44,6 @@ x86_64-apple-darwin
 x86_64-unknown-freebsd
 x86_64-unknown-openbsd
 x86_64-unknown-netbsd
-x86_64-unknown-dragonfly
-x86_64-unknown-haiku
-x86_64-unknown-hurd-gnu
 x86_64-unknown-illumos
 x86_64-pc-solaris
 "
@@ -1366,10 +1363,13 @@ pkg_names() {
 	zypper:rizin | apk:rizin | pkgin:rizin | pkg_add:rizin) printf radare2 ;;
 	brew:upx | dnf:upx | pacman:upx | zypper:upx | apk:upx | pkg:upx | pkgin:upx | pkg_add:upx) printf upx ;;
 	apt:upx) printf upx-ucl ;;
+	# Upstream 7-Zip (`7zz`) first, p7zip (`7z`) as fallback: p7zip is a fork of
+	# 7-Zip 16.02 with no APFS handler, so .dmg contents go unscanned. Listing
+	# both is safe — the caller takes the first name the repos advertise.
 	brew:7z) printf sevenzip ;;
-	apt:7z) printf p7zip-full ;;
-	dnf:7z | pacman:7z | zypper:7z | apk:7z | pkgin:7z | pkg_add:7z) printf p7zip ;;
-	pkg:7z) printf 7-zip ;;
+	apt:7z) printf '7zip p7zip-full' ;;
+	dnf:7z | pacman:7z | zypper:7z | apk:7z | pkgin:7z | pkg_add:7z) printf '7zip p7zip' ;;
+	pkg:7z) printf '7-zip p7zip' ;;
 	brew:innoextract | apt:innoextract | dnf:innoextract | pacman:innoextract | zypper:innoextract | pkg:innoextract) printf innoextract ;;
 	*) : ;;
 	esac
@@ -1474,6 +1474,21 @@ check_tools() {
 	if [ -n "$ct_not_installed" ]; then
 		note "available, but not installed:${ct_not_installed}"
 	fi
+	seven_zip_advice
+}
+
+# Warn when the only 7-Zip is p7zip's `7z`. It satisfies the check above, so
+# nothing else would mention it — but without an APFS handler a .dmg yields one
+# opaque blob and its contents go unscanned.
+seven_zip_advice() {
+	[ "$(uname -s)" = Windows_NT ] && return 0
+	have_tool 7zz && return 0
+	have_tool 7z || return 0
+
+	sza_pkg=$(pkg_names 7z | cut -d' ' -f1)
+	gap
+	warn "only p7zip's '7z' found — upstream 7-Zip ('7zz') also reads APFS/.dmg"
+	[ -n "$sza_pkg" ] && [ -n "$PM_INSTALL" ] && note "$PM_INSTALL $sza_pkg"
 }
 
 # ---------------------------------------------------------------------------

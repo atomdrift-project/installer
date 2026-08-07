@@ -31,7 +31,7 @@ if [ -f "$SCAN_WORKFLOW" ]; then
 			}
 		}' "$SCAN_WORKFLOW" | sort)
 	# shellcheck disable=SC2086 # TARGETS is intentionally a newline-separated list.
-	installer_targets=$(printf '%s\n' $TARGETS x86_64-pc-windows-msvc | sort)
+	installer_targets=$(printf '%s\n' $TARGETS x86_64-pc-windows-msvc aarch64-pc-windows-msvc | sort)
 	[ "$installer_targets" = "$expected_targets" ] || fail 'installer target list has drifted from release.yml'
 	printf 'ok - installer target inventory matches release.yml\n'
 fi
@@ -86,6 +86,16 @@ assert_platform() {
 	printf 'ok - %s -> %s\n' "$ap_label" "$SELF"
 }
 
+assert_source_platform() {
+	asp_label=$1
+	MOCK_OS=$2 MOCK_ARCH=$3 MOCK_OPERATING=$4 MOCK_VERSION=$5
+	MOCK_ARM64=$6 MOCK_MUSL=$7 asp_expected=$8
+	detect_platform
+	[ "$SELF" = "$asp_expected" ] || fail "$asp_label: got $SELF, expected $asp_expected"
+	[ -z "$TARGET" ] || fail "$asp_label: unsupported release target unexpectedly selected $TARGET"
+	printf 'ok - %s has no release binary\n' "$asp_label"
+}
+
 assert_platform 'Linux/openEuler x86_64 glibc' Linux x86_64 GNU/Linux test 0 0 x86_64-unknown-linux-gnu
 assert_platform 'Linux arm64 glibc' Linux arm64 GNU/Linux test 0 0 aarch64-unknown-linux-gnu
 assert_platform 'Linux x86_64 musl' Linux x86_64 GNU/Linux test 0 1 x86_64-unknown-linux-musl
@@ -110,9 +120,9 @@ assert_platform 'FreeBSD' FreeBSD amd64 FreeBSD test 0 0 x86_64-unknown-freebsd
 printf 'ok - platform display is concise and human-readable\n'
 assert_platform 'OpenBSD' OpenBSD amd64 OpenBSD test 0 0 x86_64-unknown-openbsd
 assert_platform 'NetBSD' NetBSD amd64 NetBSD test 0 0 x86_64-unknown-netbsd
-assert_platform 'DragonFly BSD' DragonFly x86_64 DragonFly test 0 0 x86_64-unknown-dragonfly
-assert_platform 'experimental Haiku mapping' Haiku x86_64 Haiku test 0 0 x86_64-unknown-haiku
-assert_platform 'experimental GNU/Hurd mapping' GNU x86_64 GNU test 0 0 x86_64-unknown-hurd-gnu
+assert_source_platform 'DragonFly BSD' DragonFly x86_64 DragonFly test 0 0 x86_64-unknown-dragonfly
+assert_source_platform 'experimental Haiku mapping' Haiku x86_64 Haiku test 0 0 x86_64-unknown-haiku
+assert_source_platform 'experimental GNU/Hurd mapping' GNU x86_64 GNU test 0 0 x86_64-unknown-hurd-gnu
 assert_platform 'illumos/OpenIndiana/Tribblix' SunOS i86pc illumos 'omnios-r151058' 0 0 x86_64-unknown-illumos
 assert_platform 'Solaris' SunOS i86pc Solaris '11.4' 0 0 x86_64-pc-solaris
 

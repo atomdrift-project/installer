@@ -6,8 +6,9 @@ $env:ATOMSCAN_INSTALLER_TESTING = '1'
 
 Initialize-Style
 Resolve-Platform
-if ($script:Self -ne 'x86_64-pc-windows-msvc') {
-	throw "detected $($script:Self), expected x86_64-pc-windows-msvc"
+$expectedTarget = if ($env:EXPECTED_TARGET) { $env:EXPECTED_TARGET } else { 'x86_64-pc-windows-msvc' }
+if ($script:Self -ne $expectedTarget) {
+	throw "detected $($script:Self), expected $expectedTarget"
 }
 if ($script:Target -ne $script:Self) {
 	throw "$($script:Self) is not release-backed"
@@ -73,13 +74,13 @@ public static class FixtureTwo {
 	$payload = Join-Path $root 'payload'
 	New-Item -ItemType Directory -Force -Path $payload | Out-Null
 	Copy-Item -LiteralPath $fixtureTwo -Destination (Join-Path $payload 'atomscan.exe')
-	$archiveName = 'atomscan-9.9.10-x86_64-pc-windows-msvc.tar.gz'
-	$archive = Join-Path $root $archiveName
-	& tar.exe -czf $archive -C $payload atomscan.exe
+	$fixtureArchiveName = "atomscan-9.9.10-$expectedTarget.tar.gz"
+	$fixtureArchivePath = Join-Path $root $fixtureArchiveName
+	& tar.exe -czf $fixtureArchivePath -C $payload atomscan.exe
 	if ($LASTEXITCODE -ne 0) { throw 'could not build Windows release fixture' }
-	$archiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+	$fixtureArchiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $fixtureArchivePath).Hash.ToLowerInvariant()
 	$releaseSums = Join-Path $root 'release-SHA256SUMS'
-	[System.IO.File]::WriteAllText($releaseSums, "$archiveHash  $archiveName`n")
+	[System.IO.File]::WriteAllText($releaseSums, "$fixtureArchiveHash  $fixtureArchiveName`n")
 
 	function Test-UrlExists([string]$Url) { return $true }
 	function Test-Provenance([string]$File) { return $false }
@@ -92,8 +93,8 @@ public static class FixtureTwo {
 			Copy-Item -LiteralPath $releaseSums -Destination $Path
 		} elseif ($Url.EndsWith('/SHA256SUMS.sigstore.json')) {
 			[System.IO.File]::WriteAllText($Path, '{}')
-		} elseif ($Url.EndsWith("/$archiveName")) {
-			Copy-Item -LiteralPath $archive -Destination $Path
+		} elseif ($Url.EndsWith("/$fixtureArchiveName")) {
+			Copy-Item -LiteralPath $fixtureArchivePath -Destination $Path
 		} else {
 			throw "unexpected fixture URL: $Url"
 		}
