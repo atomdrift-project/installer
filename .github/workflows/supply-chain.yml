@@ -1,0 +1,21 @@
+# Supply-chain review: judges what this change does that the code before it
+# didn't. Added by https://install.atomdrift.org/isomer-action.sh
+#
+# No build step was detected here. To also compare build output, see
+# https://github.com/atomdrift-project/isomer-action/blob/v0.1.0/examples/build-comparison.yml
+name: supply-chain
+
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: write    # sticky comment      (optional)
+  security-events: write  # inline annotations  (optional)
+
+jobs:
+  isomer:
+    name: isomer · source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: atomdrift-project/isomer-action@v0.1.0
