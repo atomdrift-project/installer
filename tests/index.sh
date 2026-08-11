@@ -32,6 +32,21 @@ assert_page_contains 'class="window-controls"'
 assert_page_contains 'class="command-target"'
 assert_page_contains 'x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE'
 
+# The GitHub Action installer: its entry point, the one file it writes, and the
+# stacks it claims to detect all have to match action.sh.
+assert_page_contains 'curl -fsSL https://install.atomdrift.org/action.sh | sh'
+assert_page_contains '.github/workflows/supply-chain.yml'
+assert_page_contains 'https://github.com/atomdrift-project/isomer-action'
+assert_page_contains 'Node · Rust · Go · Python'
+for option in --source-only --dry-run --force; do
+	assert_page_contains "<dt>$option</dt>"
+done
+
+# isomer is an early build. The page has to say so where the command is, not
+# leave a reader to find out from the action's README.
+grep -F 'class="badge">experimental<' "$PAGE" >/dev/null \
+	|| fail 'installer page no longer labels the GitHub Action as experimental'
+
 if grep -F 'Linux binaries:' "$PAGE" >/dev/null; then
 	fail 'installer page still labels the shared architecture list as Linux-only'
 fi

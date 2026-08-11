@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Install Atomdrift Scan, the open-source malware and supply-chain scanner for files, packages, URLs, and running processes.">
+  <meta name="description" content="Install Atomdrift Scan, the open-source malware and supply-chain scanner, and the experimental isomer GitHub Action that reviews every pull request.">
   <meta name="theme-color" content="#d0ff00">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Install Atomdrift Scan">
-  <meta property="og:description" content="Local malware and supply-chain scanning with static analysis and CPU-based ML. No cloud scanner, API key, GPU, or sample upload required.">
-  <title>Install Atomdrift Scan</title>
+  <meta property="og:title" content="Install Atomdrift">
+  <meta property="og:description" content="Local malware and supply-chain scanning with static analysis and CPU-based ML, on your machine and on your pull requests. No cloud scanner, API key, GPU, or sample upload required.">
+  <title>Install Atomdrift</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>%E2%9A%9B</text></svg>">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,6 +26,8 @@
       --toxic: #d0ff00;
       --toxic-muted: #9abe25;
       --toxic-dark: #4a6b0f;
+      --warn-bg: #fffceb;
+      --warn-border: #ecdda2;
       --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       --display: Oxanium, "Arial Narrow", sans-serif;
       --body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -142,9 +144,38 @@
       margin-top: 12px;
     }
 
-    .section-head { margin: 38px 0 14px; }
+    .section-head { margin: 44px 0 16px; }
     .hero + section .section-head { margin-top: 0; }
     .section-head h2 { font-size: 22px; letter-spacing: -.4px; }
+    .section-copy { color: var(--graphite); font-size: 14px; margin-top: 5px; max-width: 760px; }
+
+    .sub-head { margin: 26px 0 12px; }
+    .sub-head h3 { font-size: 17px; letter-spacing: -.2px; }
+
+    .badge {
+      background: var(--toxic);
+      border-radius: 999px;
+      color: var(--toxic-dark);
+      font: 700 10px var(--mono);
+      letter-spacing: .09em;
+      margin-left: 8px;
+      padding: 4px 9px;
+      text-transform: uppercase;
+      vertical-align: 3px;
+    }
+
+    .notice {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-left: 3px solid var(--toxic-muted);
+      border-radius: 10px;
+      color: var(--graphite);
+      font-size: 13.5px;
+      margin-bottom: 18px;
+      padding: 13px 16px;
+    }
+
+    .notice strong { color: var(--carbon); }
 
     /* Two columns only while a card is still wide enough for the full command on one line. */
     .installer-grid { align-items: stretch; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr)); gap: 18px; min-width: 0; }
@@ -216,6 +247,15 @@
     .support { background: var(--cream); border-top: 1px solid var(--border); flex: 1; padding: 16px 20px 20px; }
     .support-title { color: var(--iron); font: 700 10px var(--mono); letter-spacing: .08em; margin-bottom: 9px; text-transform: uppercase; }
     .support-copy { color: var(--graphite); font-size: 13px; }
+    /* A workflow path is one long unbreakable token; let it wrap rather than
+       widen the card on a narrow screen. */
+    .support-copy code { font: 12px var(--mono); overflow-wrap: anywhere; }
+    .support + .support { border-top-style: dashed; flex: 0 0 auto; }
+
+    .options { display: grid; gap: 6px 16px; grid-template-columns: max-content 1fr; }
+    .options dt { color: var(--carbon); font: 12px/1.55 var(--mono); white-space: nowrap; }
+    .options dd { color: var(--graphite); font-size: 13px; }
+
     .alternative { align-items: center; border: 1px solid var(--border); border-radius: 12px; display: flex; gap: 24px; justify-content: space-between; padding: 20px 22px; }
     .alternative h3 { font-size: 17px; }
     .alternative p { color: var(--iron); font-size: 14px; margin-top: 4px; max-width: 680px; }
@@ -244,6 +284,11 @@
       .hero { padding-bottom: 28px; }
       h1 { letter-spacing: -1px; }
       .behavior-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .options { grid-template-columns: 1fr; }
+      .options dd { margin-bottom: 6px; }
     }
 
     @media (max-width: 560px) {
@@ -279,6 +324,7 @@
       </a>
       <nav class="header-links" aria-label="External links">
         <a href="https://atomdrift.org/scan/">Scan</a>
+        <a href="https://atomdrift.org/isomer/">isomer</a>
         <a href="https://github.com/atomdrift-project/installer">Source</a>
       </nav>
     </div>
@@ -287,14 +333,15 @@
 
   <main>
     <section class="hero">
-      <h1>Install Atomdrift Scan</h1>
+      <h1>Install Atomdrift</h1>
       <p class="hero-tagline">The open-source malware scanner that doesn’t suck.</p>
-      <p class="hero-copy">Scan files, directories, archives, packages, URLs, and running processes with local static analysis and CPU-based ML. No cloud scanner, API key, GPU, or sample upload required.</p>
+      <p class="hero-copy">Two ways to run it: <a href="#local">Atomdrift Scan</a> on the machine in front of you, and the experimental <a href="#github">isomer action</a> on every pull request to your GitHub projects. Both analyze locally — no cloud scanner, API key, GPU, or sample upload required.</p>
     </section>
 
-    <section id="installers" aria-labelledby="installers-title">
+    <section id="local" aria-labelledby="local-title">
       <div class="section-head">
-        <h2 id="installers-title">Choose your platform</h2>
+        <h2 id="local-title">For your machine</h2>
+        <p class="section-copy">Atomdrift Scan checks files, directories, archives, packages, URLs, and running processes with static analysis and CPU-based ML.</p>
       </div>
 
       <div class="installer-grid">
@@ -341,11 +388,9 @@
         </article>
 
       </div>
-    </section>
 
-    <section id="downloads" aria-labelledby="downloads-title">
-      <div class="section-head">
-        <h2 id="downloads-title">Manual download</h2>
+      <div class="sub-head">
+        <h3>Manual download</h3>
       </div>
       <article class="alternative">
         <div>
@@ -354,11 +399,9 @@
         </div>
         <a class="text-link" href="https://github.com/atomdrift-project/scan/releases/latest">View releases →</a>
       </article>
-    </section>
 
-    <section id="behavior" aria-labelledby="behavior-title">
-      <div class="section-head">
-        <h2 id="behavior-title">What the installer does</h2>
+      <div class="sub-head">
+        <h3>What the installer does</h3>
       </div>
       <dl class="behavior-grid">
         <div class="behavior-item"><dt>Detects</dt><dd>Matches the operating system, CPU, and Linux libc to the right install method and release. Static ARM32 and LoongArch binaries also work across glibc, musl, and uClibc userlands.</dd></div>
@@ -366,6 +409,54 @@
         <div class="behavior-item"><dt>Installs safely</dt><dd>Uses a directory on PATH and replaces atomically. Privilege is requested only when needed.</dd></div>
       </dl>
       <p class="fine-print">Review the <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">shell installer</a> or <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">PowerShell installer</a>.</p>
+    </section>
+
+    <section id="github" aria-labelledby="github-title">
+      <div class="section-head">
+        <h2 id="github-title">For your GitHub projects <span class="badge">experimental</span></h2>
+        <p class="section-copy"><a href="https://atomdrift.org/isomer/">isomer</a> judges what a pull request <em>does</em> that the code before it didn’t: a dependency bump that quietly gains a socket, a “perf” commit that adds a <code>postinstall</code> hook, a vendored binary that grew an ifunc resolver. It runs entirely on your runner.</p>
+      </div>
+
+      <p class="notice"><strong>Early build — expect it to change.</strong> Verdicts, flags, and output formats change without notice, and there is no stable release yet. Try it, break it, <a href="https://github.com/atomdrift-project/isomer-action/issues">file issues</a> — just don’t wire it into anything you can’t unwire.</p>
+
+      <div class="installer-grid">
+        <article class="installer-card" data-installer="isomer-action">
+          <div class="card-main">
+            <h3>GitHub Actions</h3>
+            <p class="card-description">Run it anywhere inside a checkout of the repository you want to protect. It writes one workflow file and never touches git — reviewing and committing it stays your call.</p>
+            <div class="terminal">
+              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
+              <div class="command-row">
+                <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/action.sh | sh</span></code>
+                <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/action.sh | sh" aria-label="Copy the isomer action install command">copy</button>
+              </div>
+            </div>
+          </div>
+          <div class="support">
+            <p class="support-title">Writes</p>
+            <p class="support-copy"><code>.github/workflows/supply-chain.yml</code>, and nothing else. Re-running is a no-op.</p>
+            <p class="support-copy">Node · Rust · Go · Python builds are detected and compared; anything else gets a source-only workflow.</p>
+          </div>
+          <div class="support">
+            <p class="support-title">Options</p>
+            <dl class="options">
+              <dt>--source-only</dt><dd>Audit the source only; skip the build-output comparison.</dd>
+              <dt>--dry-run</dt><dd>Print the workflow instead of writing it.</dd>
+              <dt>--force</dt><dd>Replace an existing workflow that differs.</dd>
+            </dl>
+          </div>
+        </article>
+      </div>
+
+      <div class="sub-head">
+        <h3>What the workflow does</h3>
+      </div>
+      <dl class="behavior-grid">
+        <div class="behavior-item"><dt>Audits first</dt><dd>The source is reviewed before anything is built, because building a pull request executes it. The build job itself holds no write permission.</dd></div>
+        <div class="behavior-item"><dt>Compares output</dt><dd>The build’s result is diffed against the base branch’s, because a backdoor injected during the build is in neither commit and no diff can show it.</dd></div>
+        <div class="behavior-item"><dt>Stays quiet</dt><dd>A green check and a one-line summary is the normal result. When it isn’t, the check fails and one comment is edited in place — never a second one.</dd></div>
+      </dl>
+      <p class="fine-print">Review the <a href="https://github.com/atomdrift-project/installer/blob/main/action.sh">workflow installer</a>, or the <a href="https://github.com/atomdrift-project/isomer-action">action</a> it wires up. One build in the common case: the base branch’s output is cached under the commit that produced it.</p>
     </section>
   </main>
 

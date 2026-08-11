@@ -39,8 +39,16 @@ jobs:
 
       - name: Lint
         run: |
-          shellcheck -s sh scan.sh tests/*.sh
+          shellcheck -s sh scan.sh action.sh tests/*.sh
           sh tests/workflow.sh
+
+      - name: Test the GitHub Action workflow installer
+        run: |
+          sh tests/action.sh
+          dash tests/action.sh
+          ksh tests/action.sh
+          bash --posix tests/action.sh
+          zsh --emulate sh tests/action.sh
 
       - name: Test target inventory and platform mappings
         env:

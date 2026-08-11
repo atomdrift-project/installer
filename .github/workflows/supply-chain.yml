@@ -1,5 +1,5 @@
 # Supply-chain review: judges what this change does that the code before it
-# didn't. Added by https://install.atomdrift.org/isomer-action.sh
+# didn't. Added by https://install.atomdrift.org/action.sh
 #
 # No build step was detected here. To also compare build output, see
 # https://github.com/atomdrift-project/isomer-action/blob/v0.1.0/examples/build-comparison.yml
