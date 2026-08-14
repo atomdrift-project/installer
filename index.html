@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Install Atomdrift Scan, the open-source malware and supply-chain scanner, and the experimental isomer GitHub Action that reviews every pull request.">
+  <meta name="description" content="Install the Atomdrift tools: Scan, cleave, isomer, and hood. One command each, on macOS, Linux, BSD, Solaris, and Windows.">
   <meta name="theme-color" content="#d0ff00">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Install Atomdrift">
-  <meta property="og:description" content="Local malware and supply-chain scanning with static analysis and CPU-based ML, on your machine and on your pull requests. No cloud scanner, API key, GPU, or sample upload required.">
+  <meta property="og:description" content="Local malware and supply-chain analysis, on your machine and on your pull requests. No cloud scanner, API key, GPU, or sample upload required.">
   <title>Install Atomdrift</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>%E2%9A%9B</text></svg>">
   <style>
@@ -18,7 +18,6 @@
       --graphite: #404040;
       --iron: #52525b;
       --slate: #6b7280;
-      --mist: #f5f5f5;
       --white: #fff;
       --cream: #fafaf9;
       --border: #e8e8e8;
@@ -26,8 +25,6 @@
       --toxic: #d0ff00;
       --toxic-muted: #9abe25;
       --toxic-dark: #4a6b0f;
-      --warn-bg: #fffceb;
-      --warn-border: #ecdda2;
       --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       --display: Oxanium, "Arial Narrow", sans-serif;
       --body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -59,14 +56,8 @@
       padding: 14px 0;
     }
 
-    .header-inner, .footer-inner {
-      max-width: 1200px;
-      margin-inline: auto;
-      width: calc(100% - 40px);
-    }
-
-    main {
-      max-width: 1200px;
+    .header-inner, .footer-inner, main {
+      max-width: 1120px;
       margin-inline: auto;
       width: calc(100% - 40px);
     }
@@ -87,6 +78,7 @@
     }
 
     .atom-logo { width: 38px; height: 38px; flex: 0 0 auto; }
+
     .brand-name {
       font-family: var(--display);
       font-size: 24px;
@@ -107,23 +99,16 @@
       text-decoration: none;
     }
 
-    .header-links a:last-child { background: var(--carbon); border-color: var(--carbon); color: var(--white); }
     .header-links a:hover { border-color: var(--blue); }
-
     .toxic-stripe { height: 3px; background: linear-gradient(90deg, var(--toxic), var(--toxic-muted) 48%, transparent); }
 
-    main { padding-block: 54px 24px; }
+    main { padding-block: 46px 20px; }
 
-    .hero {
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 34px;
-      padding-bottom: 42px;
-    }
-
+    .hero { margin-bottom: 34px; }
     h1, h2, h3 { font-family: var(--display); }
 
     h1 {
-      font-size: clamp(36px, 6vw, 54px);
+      font-size: clamp(34px, 5.5vw, 50px);
       letter-spacing: -2px;
       line-height: 1.02;
     }
@@ -131,26 +116,34 @@
     .hero-copy {
       color: var(--graphite);
       font-size: 16px;
-      margin-top: 8px;
-      max-width: 760px;
+      margin-top: 10px;
+      max-width: 720px;
     }
 
-    .hero-tagline {
-      color: var(--graphite);
-      font-family: var(--display);
-      font-size: clamp(20px, 3vw, 25px);
-      font-weight: 700;
-      letter-spacing: -.35px;
-      margin-top: 12px;
+    /* One card per installer. The minimum width is set by the longest install
+       command: a command that wraps or scrolls is a command people mistype. */
+    .installer-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(min(470px, 100%), 1fr));
     }
 
-    .section-head { margin: 44px 0 16px; }
-    .hero + section .section-head { margin-top: 0; }
-    .section-head h2 { font-size: 22px; letter-spacing: -.4px; }
-    .section-copy { color: var(--graphite); font-size: 14px; margin-top: 5px; max-width: 760px; }
+    .installer-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 20px;
+      transition: box-shadow .2s, border-color .2s;
+    }
 
-    .sub-head { margin: 26px 0 12px; }
-    .sub-head h3 { font-size: 17px; letter-spacing: -.2px; }
+    .installer-card:hover { border-color: #dcdcdc; box-shadow: 0 10px 28px rgba(10, 10, 10, .07); }
+
+    .card-head { align-items: baseline; display: flex; flex-wrap: wrap; gap: 8px; }
+    .installer-card h3 { font-size: 21px; letter-spacing: -.3px; }
+    .card-binary { color: var(--slate); font: 12px var(--mono); }
 
     .badge {
       background: var(--toxic);
@@ -158,74 +151,25 @@
       color: var(--toxic-dark);
       font: 700 10px var(--mono);
       letter-spacing: .09em;
-      margin-left: 8px;
-      padding: 4px 9px;
+      padding: 3px 8px;
       text-transform: uppercase;
-      vertical-align: 3px;
     }
 
-    .notice {
-      background: var(--warn-bg);
-      border: 1px solid var(--warn-border);
-      border-left: 3px solid var(--toxic-muted);
-      border-radius: 10px;
-      color: var(--graphite);
-      font-size: 13.5px;
-      margin-bottom: 18px;
-      padding: 13px 16px;
-    }
+    /* Three reserved lines, so the command in a short card still lands level
+       with the command in the card beside it. */
+    .card-description { color: var(--graphite); font-size: 14px; margin-top: 6px; min-height: 66px; }
 
-    .notice strong { color: var(--carbon); }
-
-    /* Two columns only while a card is still wide enough for the full command on one line. */
-    .installer-grid { align-items: stretch; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr)); gap: 18px; min-width: 0; }
-
-    .installer-card {
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      container-type: inline-size;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      overflow: hidden;
-      transition: box-shadow .2s;
-    }
-
-    .installer-card:hover {
-      box-shadow: 0 10px 28px rgba(10, 10, 10, .07);
-    }
-
-    /* min-height keeps the two side-by-side cards' terminals on the same line.
-       A full-width card has no neighbour to line up with, so it drops the spacer. */
-    .card-main { display: flex; flex: 0 0 auto; flex-direction: column; min-height: 255px; min-width: 0; padding: 20px; }
-    @container (min-width: 640px) {
-      .card-main { min-height: 0; }
-      .card-main .terminal { margin-top: 20px; }
-    }
-    .installer-card h3 { font-size: 22px; letter-spacing: -.3px; }
-    .card-description { color: var(--graphite); font-size: 14px; margin-top: 5px; }
-
-    .terminal { background: var(--carbon); border-radius: 9px; color: #f4f4f5; margin-top: auto; min-width: 0; overflow: hidden; }
-    .terminal-bar { align-items: center; border-bottom: 1px solid #292929; display: flex; gap: 6px; height: 34px; padding: 0 11px; }
-    .terminal-dot { border-radius: 50%; height: 7px; width: 7px; }
-    .terminal-dot:nth-child(1) { background: #ff4646; }
-    .terminal-dot:nth-child(2) { background: #ffaf37; }
-    .terminal-dot:nth-child(3) { background: #50c850; }
-    .terminal-label { color: #8b8b92; font: 10px var(--mono); margin-left: 4px; text-transform: uppercase; }
-    .command-row { align-items: center; display: flex; gap: 8px; min-width: 0; padding: 12px; }
+    .terminal { background: var(--carbon); border-radius: 9px; color: #f4f4f5; margin-top: 14px; min-width: 0; overflow: hidden; }
+    .terminal + .terminal { margin-top: 10px; }
+    .command-row { align-items: center; display: flex; gap: 8px; min-width: 0; padding: 11px 12px; }
     .command-row code { color: #fff; flex: 1; font: 12px/1.55 var(--mono); max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
     .command-row code::before { color: var(--toxic); content: "$ "; }
 
-    .terminal-windows { border: 1px solid #d6d6d6; border-radius: 7px; }
-    .terminal-windows .terminal-bar { background: #f3f3f3; border-bottom-color: #d6d6d6; gap: 8px; height: 34px; padding: 0 0 0 10px; }
-    .terminal-windows .terminal-app { align-items: center; background: #0b67b2; color: #fff; display: flex; font: 700 9px Consolas, monospace; height: 18px; justify-content: center; width: 18px; }
-    .terminal-windows .terminal-label { color: #252525; font: 12px "Segoe UI", sans-serif; margin: 0; text-transform: none; }
-    .window-controls { align-self: stretch; display: flex; margin-left: auto; }
-    .window-control { align-items: center; color: #333; display: flex; font: 12px "Segoe UI Symbol", sans-serif; justify-content: center; width: 34px; }
-    .window-control:last-child { font-size: 14px; }
-    .terminal-windows .command-row code { font-family: Consolas, "Liberation Mono", monospace; }
-    .terminal-windows .command-row code::before { color: #60a5fa; content: "PS> "; }
+    .terminal-windows { background: #f3f3f3; border: 1px solid #d6d6d6; }
+    .terminal-windows .command-row code { color: #1a1a1a; font-family: Consolas, "Liberation Mono", monospace; }
+    .terminal-windows .command-row code::before { color: #0b67b2; content: "PS> "; }
+    .terminal-windows .copy-button { background: var(--white); border-color: #d6d6d6; color: var(--graphite); }
+    .terminal-windows .copy-button:hover { border-color: var(--blue); color: var(--blue); }
 
     .copy-button {
       background: #222;
@@ -244,24 +188,14 @@
     .copy-button:hover { border-color: var(--toxic-muted); color: var(--toxic); }
     .copy-button.copied { background: var(--toxic); border-color: var(--toxic); color: var(--carbon); }
 
-    .support { background: var(--cream); border-top: 1px solid var(--border); flex: 1; padding: 16px 20px 20px; }
-    .support-title { color: var(--iron); font: 700 10px var(--mono); letter-spacing: .08em; margin-bottom: 9px; text-transform: uppercase; }
-    .support-copy { color: var(--graphite); font-size: 13px; }
-    /* A workflow path is one long unbreakable token; let it wrap rather than
-       widen the card on a narrow screen. */
-    .support-copy code { font: 12px var(--mono); overflow-wrap: anywhere; }
-    .support + .support { border-top-style: dashed; flex: 0 0 auto; }
+    .card-meta { color: var(--slate); font-size: 12.5px; margin-top: 12px; }
+    .card-meta a { color: var(--iron); }
 
-    .options { display: grid; gap: 6px 16px; grid-template-columns: max-content 1fr; }
-    .options dt { color: var(--carbon); font: 12px/1.55 var(--mono); white-space: nowrap; }
-    .options dd { color: var(--graphite); font-size: 13px; }
+    .section-head { margin: 46px 0 14px; }
+    .section-head h2 { font-size: 20px; letter-spacing: -.4px; }
+    .section-copy { color: var(--graphite); font-size: 14px; margin-top: 5px; max-width: 760px; }
 
-    .alternative { align-items: center; border: 1px solid var(--border); border-radius: 12px; display: flex; gap: 24px; justify-content: space-between; margin-top: 18px; padding: 20px 22px; }
-    .alternative h3 { font-size: 17px; }
-    .alternative p { color: var(--iron); font-size: 14px; margin-top: 4px; max-width: 680px; }
-    .text-link { font-size: 14px; font-weight: 600; white-space: nowrap; }
-
-    .behavior-grid {
+    .facts {
       border: 1px solid var(--border);
       border-radius: 14px;
       display: grid;
@@ -270,41 +204,46 @@
       overflow: hidden;
     }
 
-    .behavior-item { background: var(--cream); border: 1px solid var(--border); margin: -1px 0 0 -1px; padding: 18px; }
-    .behavior-item dt { color: var(--carbon); font: 700 11px var(--mono); letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
-    .behavior-item dd { color: var(--graphite); font-size: 13px; line-height: 1.55; }
+    .facts div { background: var(--cream); border: 1px solid var(--border); margin: -1px 0 0 -1px; padding: 17px 18px; }
+    .facts dt { color: var(--carbon); font: 700 11px var(--mono); letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
+    .facts dd { color: var(--graphite); font-size: 13px; line-height: 1.55; }
+    .facts code { font: 12px var(--mono); overflow-wrap: anywhere; }
 
-    .fine-print { color: var(--slate); font-size: 13px; margin-top: 13px; }
-    .site-footer { background: var(--carbon); color: var(--slate); font-size: 13px; margin-top: 42px; padding: 20px 0; position: relative; }
+    .options { display: grid; gap: 5px 16px; grid-template-columns: max-content 1fr; margin-top: 10px; }
+    .options dt { color: var(--carbon); font: 12px/1.55 var(--mono); white-space: nowrap; }
+    .options dd { color: var(--graphite); font-size: 13px; }
+
+    .fine-print { color: var(--slate); font-size: 13px; margin-top: 14px; }
+    .fine-print a { color: var(--iron); }
+
+    .site-footer { background: var(--carbon); color: var(--slate); font-size: 13px; margin-top: 44px; padding: 20px 0; position: relative; }
     .site-footer::before { background: var(--toxic); content: ""; height: 3px; left: 0; position: absolute; top: 0; width: 90px; }
     .footer-inner { display: flex; justify-content: space-between; gap: 20px; }
-    @media (max-width: 760px) {
-      .header-links a:first-child { display: none; }
-      main { padding-top: 24px; }
-      .hero { padding-bottom: 28px; }
-      h1 { letter-spacing: -1px; }
-      .behavior-grid { grid-template-columns: 1fr; }
+
+    @media (max-width: 860px) {
+      .facts { grid-template-columns: 1fr; }
     }
 
-    @media (max-width: 560px) {
-      .options { grid-template-columns: 1fr; }
-      .options dd { margin-bottom: 6px; }
+    @media (max-width: 760px) {
+      main { padding-top: 26px; }
+      h1 { letter-spacing: -1px; }
+      .card-description { min-height: 0; }
     }
 
     @media (max-width: 560px) {
       .command-row { align-items: stretch; flex-direction: column; }
-      .command-row code { display: block; font-size: 11px; overflow: visible; white-space: normal; width: 100%; }
-      .command-target { display: block; }
+      .command-row code { display: block; font-size: 11px; overflow: visible; overflow-wrap: anywhere; white-space: normal; width: 100%; }
       .copy-button { align-self: end; }
+      .options { grid-template-columns: 1fr; }
+      .options dd { margin-bottom: 6px; }
     }
 
     @media (max-width: 440px) {
       .header-inner, main, .footer-inner { width: calc(100% - 26px); }
       .header-links a { padding: 6px 9px; }
-      .alternative { align-items: start; flex-direction: column; gap: 10px; }
+      .header-links a:first-child { display: none; }
       .footer-inner { flex-direction: column; gap: 4px; }
     }
-
   </style>
 </head>
 <body>
@@ -323,8 +262,7 @@
         <span class="brand-name">atom<span>drift</span></span>
       </a>
       <nav class="header-links" aria-label="External links">
-        <a href="https://atomdrift.org/scan/">Scan</a>
-        <a href="https://atomdrift.org/isomer/">isomer</a>
+        <a href="https://atomdrift.org/">Docs</a>
         <a href="https://github.com/atomdrift-project/installer">Source</a>
       </nav>
     </div>
@@ -334,125 +272,129 @@
   <main>
     <section class="hero">
       <h1>Install Atomdrift</h1>
-      <p class="hero-tagline">The open-source malware scanner that doesn’t suck.</p>
-      <p class="hero-copy">Two ways to run it: <a href="#local">Atomdrift Scan</a> on the machine in front of you, and the experimental <a href="#github">isomer action</a> on every pull request to your GitHub projects. Both analyze locally — no cloud scanner, API key, GPU, or sample upload required.</p>
+      <p class="hero-copy">One command per tool. Everything analyzes locally — no cloud scanner, API key, GPU, or sample upload required.</p>
     </section>
 
-    <section id="local" aria-labelledby="local-title">
-      <div class="section-head">
-        <h2 id="local-title">For your machine</h2>
-        <p class="section-copy">Atomdrift Scan checks files, directories, archives, packages, URLs, and running processes with static analysis and CPU-based ML.</p>
-      </div>
-
+    <section aria-label="Installers">
       <div class="installer-grid">
-        <article class="installer-card" data-installer="unix">
-          <div class="card-main">
-            <h3>macOS, Linux &amp; Unix</h3>
-            <p class="card-description">Uses Homebrew when available, then falls back to a verified release binary or source build.</p>
-            <div class="terminal">
-              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
-              <div class="command-row">
-                <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/scan.sh | sh</span></code>
-                <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/scan.sh | sh" aria-label="Copy POSIX shell install command">copy</button>
-              </div>
+        <article class="installer-card" data-installer="scan">
+          <div class="card-head">
+            <h3>Scan</h3>
+            <span class="card-binary">atomscan</span>
+          </div>
+          <p class="card-description">The open-source malware scanner that doesn’t suck. Checks files, directories, archives, packages, URLs, and running processes with static analysis and CPU-based ML.</p>
+          <div class="terminal">
+            <div class="command-row">
+              <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/scan.sh | sh</span></code>
+              <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/scan.sh | sh" aria-label="Copy the Scan install command for macOS, Linux, and Unix">copy</button>
             </div>
           </div>
-          <div class="support">
-            <p class="support-title">Runs on</p>
-            <p class="support-copy">macOS · Linux · BSD · Solaris / illumos · Android</p>
-            <p class="support-copy">x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE</p>
-          </div>
-        </article>
-
-        <article class="installer-card" data-installer="windows">
-          <div class="card-main">
-            <h3>Windows</h3>
-            <p class="card-description">Installs for the current user and adds <code>atomscan</code> to PATH.</p>
-            <div class="terminal terminal-windows">
-              <div class="terminal-bar" aria-hidden="true">
-                <span class="terminal-app">&gt;_</span>
-                <span class="terminal-label">Terminal</span>
-                <span class="window-controls"><span class="window-control">—</span><span class="window-control">□</span><span class="window-control">×</span></span>
-              </div>
-              <div class="command-row">
-                <code><span class="command-prefix">irm </span><span class="command-target">https://install.atomdrift.org/scan.ps1 | iex</span></code>
-                <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/scan.ps1 | iex" aria-label="Copy PowerShell install command">copy</button>
-              </div>
+          <div class="terminal terminal-windows">
+            <div class="command-row">
+              <code><span class="command-prefix">irm </span><span class="command-target">https://install.atomdrift.org/scan.ps1 | iex</span></code>
+              <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/scan.ps1 | iex" aria-label="Copy the Scan install command for Windows PowerShell">copy</button>
             </div>
           </div>
-          <div class="support">
-            <p class="support-title">Runs on</p>
-            <p class="support-copy">Windows 10 · Windows 11 · Windows Server 2022</p>
-            <p class="support-copy">x86-64 · ARM64</p>
-          </div>
+          <p class="card-meta">Uses Homebrew when available · <a href="https://github.com/atomdrift-project/scan/releases/latest">releases</a> · <a href="https://atomdrift.org/scan/">docs</a></p>
         </article>
 
-      </div>
+        <article class="installer-card" data-installer="cleave">
+          <div class="card-head">
+            <h3>cleave</h3>
+            <span class="card-binary">cleave</span>
+          </div>
+          <p class="card-description">Static analysis that answers what a program can do. Unpacks source, binaries, bytecode, documents, and packages, then reports capabilities with the evidence behind them.</p>
+          <div class="terminal">
+            <div class="command-row">
+              <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/cleave.sh | sh</span></code>
+              <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/cleave.sh | sh" aria-label="Copy the cleave install command">copy</button>
+            </div>
+          </div>
+          <p class="card-meta">Uses Homebrew when available · <a href="https://github.com/atomdrift-project/cleave/releases/latest">releases</a> · <a href="https://github.com/atomdrift-project/cleave">source</a></p>
+        </article>
 
-      <p class="fine-print">Downloads are checked against their SHA-256 and run once before anything is replaced. Review the <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">shell installer</a> or <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">PowerShell installer</a>.</p>
+        <article class="installer-card" data-installer="isomer">
+          <div class="card-head">
+            <h3>isomer</h3>
+            <span class="card-binary">isomer</span>
+            <span class="badge">experimental</span>
+          </div>
+          <p class="card-description">Differential supply-chain analysis: what a change <em>does</em> that the code before it didn’t. Compares two trees, commits, or package versions and judges the delta.</p>
+          <div class="terminal">
+            <div class="command-row">
+              <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/isomer.sh | sh</span></code>
+              <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/isomer.sh | sh" aria-label="Copy the isomer install command">copy</button>
+            </div>
+          </div>
+          <p class="card-meta">Early build — flags and output change · <a href="https://atomdrift.org/isomer/">docs</a></p>
+        </article>
 
-      <article class="alternative">
-        <div>
-          <h3>Manual download</h3>
-          <p>Download the artifact for your target, verify <code>SHA256SUMS</code>, then place <code>atomscan</code> on PATH.</p>
-        </div>
-        <a class="text-link" href="https://github.com/atomdrift-project/scan/releases/latest">View releases →</a>
-      </article>
-    </section>
+        <article class="installer-card" data-installer="hood">
+          <div class="card-head">
+            <h3>hood</h3>
+            <span class="card-binary">hood</span>
+            <span class="badge">experimental</span>
+          </div>
+          <p class="card-description">A local check on what your package managers download. Shims <code>npm</code>, <code>pip</code>, <code>go</code>, <code>curl</code>, and friends, and classifies each artifact before it lands.</p>
+          <div class="terminal">
+            <div class="command-row">
+              <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/hood.sh | sh</span></code>
+              <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/hood.sh | sh" aria-label="Copy the hood install command">copy</button>
+            </div>
+          </div>
+          <p class="card-meta">Pre-release: builds from source · then run <code>hood install</code> · <a href="https://github.com/atomdrift-project/hood">source</a></p>
+        </article>
 
-    <section id="github" aria-labelledby="github-title">
-      <div class="section-head">
-        <h2 id="github-title">For your GitHub projects <span class="badge">experimental</span></h2>
-        <p class="section-copy"><a href="https://atomdrift.org/isomer/">isomer</a> judges what a pull request <em>does</em> that the code before it didn’t: a dependency bump that quietly gains a socket, a “perf” commit that adds a <code>postinstall</code> hook, a vendored binary that grew an ifunc resolver. It runs entirely on your runner.</p>
-      </div>
-
-      <p class="notice"><strong>Early build — expect it to change.</strong> Verdicts, flags, and output formats change without notice, and there is no stable release yet. Try it, break it, <a href="https://github.com/atomdrift-project/isomer-action/issues">file issues</a> — just don’t wire it into anything you can’t unwire.</p>
-
-      <div class="installer-grid">
         <article class="installer-card" data-installer="isomer-action">
-          <div class="card-main">
+          <div class="card-head">
             <h3>GitHub Actions</h3>
-            <p class="card-description">Run it anywhere inside a checkout of the repository you want to protect. It writes one workflow file and never touches git — reviewing and committing it stays your call.</p>
-            <div class="terminal">
-              <div class="terminal-bar" aria-hidden="true"><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-label">terminal</span></div>
-              <div class="command-row">
-                <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/action.sh | sh</span></code>
-                <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/action.sh | sh" aria-label="Copy the isomer action install command">copy</button>
-              </div>
+            <span class="card-binary">isomer-action</span>
+            <span class="badge">experimental</span>
+          </div>
+          <p class="card-description">Runs isomer on every pull request, on your own runner. Run this inside a checkout of the repository you want to protect: it writes one workflow file and never touches git.</p>
+          <div class="terminal">
+            <div class="command-row">
+              <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/action.sh | sh</span></code>
+              <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/action.sh | sh" aria-label="Copy the isomer action install command">copy</button>
             </div>
           </div>
-          <div class="support">
-            <p class="support-title">Writes</p>
-            <p class="support-copy"><code>.github/workflows/supply-chain.yml</code>, and nothing else. Re-running is a no-op.</p>
-            <p class="support-copy">Node · Rust · Go · Python builds are detected and compared; anything else gets a source-only workflow.</p>
-          </div>
-          <div class="support">
-            <p class="support-title">Options</p>
-            <dl class="options">
-              <dt>--source-only</dt><dd>Audit the source only; skip the build-output comparison.</dd>
-              <dt>--dry-run</dt><dd>Print the workflow instead of writing it.</dd>
-              <dt>--force</dt><dd>Replace an existing workflow that differs.</dd>
-            </dl>
-          </div>
+          <dl class="options">
+            <dt>--source-only</dt><dd>Audit the source only; skip the build-output comparison.</dd>
+            <dt>--dry-run</dt><dd>Print the workflow instead of writing it.</dd>
+            <dt>--force</dt><dd>Replace an existing workflow that differs.</dd>
+          </dl>
+          <p class="card-meta">Writes <code>.github/workflows/supply-chain.yml</code>, and nothing else · Node · Rust · Go · Python builds are compared · <a href="https://github.com/atomdrift-project/isomer-action">action</a></p>
         </article>
       </div>
+    </section>
 
-      <div class="sub-head">
-        <h3>What the workflow does</h3>
+    <section aria-labelledby="behavior-title">
+      <div class="section-head">
+        <h2 id="behavior-title">What every installer does</h2>
+        <p class="section-copy">The four tool installers are generated from one template, so they behave the same way and take the same options.</p>
       </div>
-      <dl class="behavior-grid">
-        <div class="behavior-item"><dt>Audits first</dt><dd>The source is reviewed before anything is built, because building a pull request executes it. The build job itself holds no write permission.</dd></div>
-        <div class="behavior-item"><dt>Compares output</dt><dd>The build’s result is diffed against the base branch’s, because a backdoor injected during the build is in neither commit and no diff can show it.</dd></div>
-        <div class="behavior-item"><dt>Stays quiet</dt><dd>A green check and a one-line summary is the normal result. When it isn’t, the check fails and one comment is edited in place — never a second one.</dd></div>
+      <dl class="facts">
+        <div>
+          <dt>Verifies first</dt>
+          <dd>Release archives are checked against <code>SHA256SUMS</code>, Sigstore signatures and build provenance are verified when <code>cosign</code> or <code>gh</code> is present, and the binary is run once before replacing anything.</dd>
+        </div>
+        <div>
+          <dt>Installs where you already are</dt>
+          <dd>Prefers Homebrew, then a verified release binary, then a source build. It picks a directory already on your PATH and only asks for <code>doas</code>, <code>pfexec</code>, or <code>sudo</code> when there is no other option.</dd>
+        </div>
+        <div>
+          <dt>Runs almost anywhere</dt>
+          <dd>macOS · Linux · BSD · Solaris / illumos · Android, and Windows for Scan.<br>x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE</dd>
+        </div>
       </dl>
-      <p class="fine-print">Review the <a href="https://github.com/atomdrift-project/installer/blob/main/action.sh">workflow installer</a>, or the <a href="https://github.com/atomdrift-project/isomer-action">action</a> it wires up. One build in the common case: the base branch’s output is cached under the commit that produced it.</p>
+      <p class="fine-print">Read before you pipe: <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">scan.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/cleave.sh">cleave.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/isomer.sh">isomer.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/hood.sh">hood.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">scan.ps1</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/action.sh">action.sh</a>. Every installer takes <code>--help</code>, <code>--dir</code>, <code>--version</code>, and <code>--method</code>; re-running one is a no-op when it is already current.</p>
     </section>
   </main>
 
   <footer class="site-footer">
     <div class="footer-inner">
       <span>© 2026 The Atomdrift Project</span>
-      <span>Apache 2.0 · scans stay local</span>
+      <span>Apache 2.0 · analysis stays local</span>
     </div>
   </footer>
 

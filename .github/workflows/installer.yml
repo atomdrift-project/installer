@@ -37,10 +37,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ksh shellcheck zsh
 
+      # The installers are generated. A stale checked-in copy is the bug this
+      # catches: what people curl is the file in the repository, not the file
+      # the template would produce today.
+      - name: Check generated installers are current
+        run: make check
+
       - name: Lint
         run: |
-          shellcheck -s sh scan.sh action.sh tests/*.sh
+          shellcheck -s sh scan.sh cleave.sh isomer.sh hood.sh action.sh tools/render.sh tests/*.sh
           sh tests/workflow.sh
+
+      - name: Test the generated installers
+        run: |
+          sh tests/generated.sh
+          dash tests/generated.sh
+          ksh tests/generated.sh
+          bash --posix tests/generated.sh
+          zsh --emulate sh tests/generated.sh
 
       - name: Test the GitHub Action workflow installer
         run: |

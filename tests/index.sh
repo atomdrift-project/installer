@@ -18,18 +18,37 @@ assert_page_contains() {
 
 [ -s "$PAGE" ] || fail 'index.html is missing or empty'
 
-assert_page_contains 'curl -fsSL https://install.atomdrift.org/scan.sh | sh'
+# Every generated installer needs a card, and every card needs a real installer
+# behind it. A tool added to products/ but not to the page is unreachable; a
+# command on the page with no installer behind it is a 404 in someone's shell.
+for conf in "$TEST_ROOT"/products/*.conf; do
+	product=$(basename "$conf" .conf)
+	assert_page_contains "curl -fsSL https://install.atomdrift.org/$product.sh | sh"
+	assert_page_contains "data-installer=\"$product\""
+	[ -f "$TEST_ROOT/$product.sh" ] || fail "page offers $product.sh, which is not checked in"
+done
+
+# Collected rather than failed on inside the loop: the loop is the far side of a
+# pipe, so an exit there would end a subshell and leave the test passing.
+missing=$(grep -o 'install\.atomdrift\.org/[a-z-]*\.sh' "$PAGE" | cut -d/ -f2 | sort -u |
+	while IFS= read -r offered; do
+		[ -f "$TEST_ROOT/$offered" ] || printf ' %s' "$offered"
+	done)
+[ -z "$missing" ] || fail "page offers installers this repository does not have:$missing"
+
+# Scan is the only tool with a Windows installer, and PowerShell is how it is
+# reached: the shell installer refuses to run there and says so.
 assert_page_contains 'irm https://install.atomdrift.org/scan.ps1 | iex'
+assert_page_contains 'class="terminal terminal-windows"'
+assert_page_contains 'class="command-target"'
+
 assert_page_contains "The open-source malware scanner that doesn’t suck."
 assert_page_contains 'files, directories, archives, packages, URLs, and running processes'
-assert_page_contains 'No cloud scanner, API key, GPU, or sample upload required.'
+assert_page_contains 'no cloud scanner, API key, GPU, or sample upload required'
 assert_page_contains 'Uses Homebrew when available'
 assert_page_contains 'https://github.com/atomdrift-project/scan/releases/latest'
 assert_page_contains 'SHA256SUMS'
 assert_page_contains 'before replacing anything'
-assert_page_contains 'class="terminal terminal-windows"'
-assert_page_contains 'class="window-controls"'
-assert_page_contains 'class="command-target"'
 assert_page_contains 'x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE'
 
 # The GitHub Action installer: its entry point, the one file it writes, and the
@@ -42,10 +61,16 @@ for option in --source-only --dry-run --force; do
 	assert_page_contains "<dt>$option</dt>"
 done
 
-# isomer is an early build. The page has to say so where the command is, not
-# leave a reader to find out from the action's README.
-grep -F 'class="badge">experimental<' "$PAGE" >/dev/null \
-	|| fail 'installer page no longer labels the GitHub Action as experimental'
+# isomer, hood, and the action are early builds. The page has to say so beside
+# the command, not leave a reader to find out from a README.
+for early in isomer hood isomer-action; do
+	awk -v tool="data-installer=\"$early\"" '
+		index($0, tool) { found = 1 }
+		found && /class="badge">experimental</ { ok = 1; exit }
+		found && /<\/article>/ { exit }
+		END { exit(ok ? 0 : 1) }
+	' "$PAGE" || fail "installer page no longer labels $early as experimental"
+done
 
 if grep -F 'Linux binaries:' "$PAGE" >/dev/null; then
 	fail 'installer page still labels the shared architecture list as Linux-only'
