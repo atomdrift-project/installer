@@ -32,6 +32,9 @@
 .PARAMETER NoTools
     Skip optional analysis tool installation (rizin, upx, 7-Zip, innoextract).
 
+.PARAMETER NoUpdate
+    Skip the post-install model and rules update.
+
 .PARAMETER NoPath
     Do not add the install directory to the user PATH.
 
@@ -60,6 +63,7 @@ param(
 	[ValidateSet('Auto', 'Binary', 'Source')]
 	[string]$Method = 'Auto',
 	[switch]$NoTools,
+	[switch]$NoUpdate,
 	[switch]$NoPath,
 	[switch]$Force,
 	[switch]$Quiet
@@ -317,7 +321,6 @@ function Format-Size([long]$Bytes) {
 
 function Save-Url([string]$Url, [string]$Path, [string]$Label) {
 	$resp = $null ; $in = $null ; $out = $null
-	Write-Step 'download' $Label
 	try {
 		$resp = (New-Request $Url).GetResponse()
 		$in = $resp.GetResponseStream()
@@ -334,7 +337,7 @@ function Save-Url([string]$Url, [string]$Path, [string]$Label) {
 		if ($resp) { $resp.Dispose() }
 	}
 	$size = (Get-Item $Path).Length
-	Write-Note "downloaded $(Format-Size $size)"
+	Write-Step 'download' "$Label  $(Format-Size $size)"
 }
 
 # ---------------------------------------------------------------------------
@@ -757,15 +760,16 @@ function Show-OptionalTools {
 
 	# name, commands that satisfy it, scoop package, winget id
 	$tools = @(
-		@{ Name = 'rizin'; Cmds = @('rizin', 'radare2', 'r2'); Scoop = 'rizin'; Winget = '' },
+		@{ Name = 'rizin'; Cmds = @('rizin', 'radare2', 'r2'); Scoop = 'rizin'; Winget = 'Rizin.Rizin' },
 		@{ Name = 'upx'; Cmds = @('upx'); Scoop = 'upx'; Winget = 'UPX.UPX' },
 		@{ Name = '7z'; Cmds = @('7z', '7zz'); Scoop = '7zip'; Winget = '7zip.7zip' },
-		@{ Name = 'innoextract'; Cmds = @('innoextract'); Scoop = 'innoextract'; Winget = '' }
+		@{ Name = 'innoextract'; Cmds = @('innoextract'); Scoop = 'innoextract'; Winget = 'dscharrer.innoextract' }
 	)
 
 	$ready = @()
 	$unavailable = @()
 	$notInstalled = @()
+	$installedTools = @()
 	$scoopPackages = @()
 	$scoopTools = @()
 	$wingetPackages = @()
@@ -794,7 +798,7 @@ function Show-OptionalTools {
 		} catch {
 			$scoopInstalled = $false
 		}
-		if ($scoopInstalled) { $ready += $scoopTools } else { $notInstalled += $scoopTools }
+		if ($scoopInstalled) { $installedTools += $scoopTools } else { $notInstalled += $scoopTools }
 	}
 	foreach ($tool in $wingetPackages) {
 		Write-Step 'tools' "winget install --id $($tool.Winget) --exact"
@@ -805,7 +809,22 @@ function Show-OptionalTools {
 		} catch {
 			$wingetInstalled = $false
 		}
-		if ($wingetInstalled) { $ready += $tool.Name } else { $notInstalled += $tool.Name }
+		if ($wingetInstalled) { $installedTools += $tool.Name } else { $notInstalled += $tool.Name }
+	}
+
+	# Package managers can add their binaries to the persisted user or machine
+	# PATH without updating this PowerShell process. Refresh it, then verify the
+	# commands rather than claiming readiness from the package-manager exit code.
+	if ($installedTools.Count) {
+		Refresh-ProcessPath
+		foreach ($toolName in $installedTools) {
+			$tool = $tools | Where-Object { $_.Name -eq $toolName } | Select-Object -First 1
+			if ($null -ne $tool -and (Test-Tool $tool.Cmds)) {
+				$ready += $toolName
+			} else {
+				$notInstalled += $toolName
+			}
+		}
 	}
 
 	if ($ready.Count) {
@@ -839,6 +858,37 @@ function Add-ToUserPath([string]$Directory) {
 	return $true
 }
 
+function Refresh-ProcessPath {
+	$parts = @($env:Path -split ';' | Where-Object { $_ -ne '' })
+	foreach ($scope in @('User', 'Machine')) {
+		$stored = [Environment]::GetEnvironmentVariable('Path', $scope)
+		if (-not $stored) { continue }
+		foreach ($path in @($stored -split ';' | Where-Object { $_ -ne '' })) {
+			$duplicate = $parts | Where-Object {
+				$_.TrimEnd('\') -ieq $path.TrimEnd('\')
+			} | Select-Object -First 1
+			if ($null -eq $duplicate) { $parts += $path }
+		}
+	}
+	$env:Path = $parts -join ';'
+}
+
+function Update-Rules {
+	if ($NoUpdate) { return }
+	Write-Gap
+	Write-Step 'update' 'refreshing models and rules'
+	try {
+		& $script:Installed update-rules *> $null
+		if ($LASTEXITCODE -eq 0) {
+			Write-Ok 'update' 'models and rules current'
+			return
+		}
+	} catch {
+		# The binary is already installed; a failed refresh must not undo that.
+	}
+	Write-Warn 'models and rules could not be updated - the first scan will retry'
+}
+
 function Write-Summary {
 	if ($Quiet) { return }
 	$version = Get-InstalledVersion $script:Installed
@@ -855,7 +905,7 @@ function Write-Summary {
 	Write-Host ("   {0}package{1}     {2} purl npm/left-pad@1.3.0" -f $script:CDim, $script:CReset, $BinName)
 	Write-Host ("   {0}explore{1}     {2} --help" -f $script:CDim, $script:CReset, $BinName)
 	Write-Host ''
-	Write-Host ("   {0}First scan fetches the model, rule, and bloom-filter bundles.{1}" -f
+	Write-Host ("   {0}Installer refreshes models, rules, and bloom filters when possible; future scans update them when stale.{1}" -f
 		$script:CDim, $script:CReset)
 	Write-Host ''
 }
@@ -903,6 +953,7 @@ function Invoke-Install {
 	if ($script:Changed) { Write-Ok 'installed' $script:Installed }
 
 	Show-OptionalTools
+	Update-Rules
 
 	if (-not $NoPath) {
 		if (Add-ToUserPath (Split-Path -Parent $script:Installed)) {

@@ -34,7 +34,7 @@ OUT=${2:-"$ROOT/$PRODUCT.sh"}
 # Every token the template accepts. A config that sets anything else has a typo
 # in it, and a config missing one of these renders a broken installer.
 # One line: awk's -v cannot carry a newline.
-TOKENS="PRODUCT DISPLAY UI_ENV TAGLINE READY FOOTER REPO BIN ENV FORMULA FORMULA_DEPS TARGETS EXAMPLES UNRELEASED_REF WINDOWS_HINT SOURCE_GB BUILD_NOTE TOOLS_BARE"
+TOKENS="PRODUCT DISPLAY UI_ENV TAGLINE READY FOOTER REPO BIN ENV FORMULA FORMULA_DEPS TARGETS EXAMPLES UNRELEASED_REF WINDOWS_HINT SOURCE_GB BUILD_NOTE TOOLS_BARE UPDATE_COMMAND"
 
 # PRODUCT is supplied rather than configured: it names the file being rendered,
 # so a config cannot disagree with its own filename.

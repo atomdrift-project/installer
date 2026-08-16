@@ -194,3 +194,23 @@ if grep -q -- '-rizin\|-upx\|-7z\|-innoextract' "$TMP/output"; then
 	fail 'tool output regressed to the negative +/- status row'
 fi
 printf 'ok - only available packages are approved and installed\n'
+
+cat >"$fake_bin/atomscan-update" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >"$UPDATE_LOG"
+EOF
+chmod 755 "$fake_bin/atomscan-update"
+INSTALLED=$fake_bin/atomscan-update
+UPDATE_COMMAND=update-rules
+OPT_UPDATE=1
+OPT_QUIET=1
+UPDATE_LOG="$TMP/update.log"
+export UPDATE_LOG
+update_rules
+[ "$(cat "$UPDATE_LOG")" = update-rules ] || fail 'rules update did not run after install'
+
+rm -f "$UPDATE_LOG"
+OPT_UPDATE=0
+update_rules
+[ ! -f "$UPDATE_LOG" ] || fail '--no-update did not skip the rules update'
+printf 'ok - rules update is best effort and opt-out\n'

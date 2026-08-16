@@ -65,9 +65,12 @@ OPT_VERSION="${ISOMER_VERSION:-}"
 OPT_DIR="${ISOMER_INSTALL_DIR:-}"
 OPT_METHOD="${ISOMER_METHOD:-auto}"
 OPT_TOOLS=1
+OPT_UPDATE=1
 OPT_FORCE=0
 OPT_QUIET=0
 [ -n "${ISOMER_NO_TOOLS:-}" ] && OPT_TOOLS=0
+[ -n "${ISOMER_NO_UPDATE:-}" ] && OPT_UPDATE=0
+UPDATE_COMMAND=""
 
 # Filled in as we go; declared here so the shape of the script is visible.
 HOST_OS=""      # uname -s; detect_platform sets it, everything else reads it
@@ -107,12 +110,13 @@ Options:
   --method METHOD     auto, binary, brew, or source. auto prefers Homebrew where
                       a formula exists, then a release binary, then source.
   --no-tools          Skip optional analysis tool installation (rizin, upx, ...).
+  --no-update         Skip any supported post-install model and rules update.
   --force             Reinstall even when the target version is already there.
   --quiet             Only report problems.
   --help              Show this message.
 
 Environment:
-  ISOMER_VERSION, ISOMER_INSTALL_DIR, ISOMER_METHOD, ISOMER_NO_TOOLS
+  ISOMER_VERSION, ISOMER_INSTALL_DIR, ISOMER_METHOD, ISOMER_NO_TOOLS, ISOMER_NO_UPDATE
   ISOMER_THEME — dark (default) or light.
   ISOMER_ASCII — force ASCII glyphs instead of the branded Unicode UI.
   NO_COLOR — disable colour (any value).
@@ -145,6 +149,7 @@ parse_args() {
 		--method) [ $# -ge 2 ] || die "--method needs a value"; OPT_METHOD=$2; shift 2 ;;
 		--method=*) OPT_METHOD=${1#*=}; shift ;;
 		--no-tools) OPT_TOOLS=0; shift ;;
+		--no-update) OPT_UPDATE=0; shift ;;
 		--force) OPT_FORCE=1; shift ;;
 		--quiet | -q) OPT_QUIET=1; shift ;;
 		--help | -h) usage; exit 0 ;;
@@ -488,10 +493,9 @@ human_size() {
 # download URL OUTFILE LABEL
 download() {
 	dl_url=$1 dl_out=$2 dl_label=$3
-	step download "$dl_label"
 	http_get "$dl_url" "$dl_out" || return 1
 	dl_got=$(file_size "$dl_out")
-	note "downloaded $(human_size "$dl_got")"
+	step download "$dl_label  $(human_size "$dl_got")"
 }
 
 # ---------------------------------------------------------------------------
@@ -1594,6 +1598,21 @@ seven_zip_advice() {
 	[ -n "$sza_pkg" ] && [ -n "$PM_INSTALL" ] && note "$PM_INSTALL $sza_pkg"
 }
 
+# Update the product's model/rule bundle when it has one. This is deliberately
+# best effort: a successful binary install should stay successful when the
+# network is unavailable or a local security tool blocks a rule file.
+update_rules() {
+	[ -n "$UPDATE_COMMAND" ] || return 0
+	[ "$OPT_UPDATE" = 1 ] || return 0
+	gap
+	step update "refreshing models and rules"
+	if "$INSTALLED" "$UPDATE_COMMAND" >/dev/null 2>&1; then
+		ok update "models and rules current"
+	else
+		warn "models and rules could not be updated — the first scan will retry"
+	fi
+}
+
 # ---------------------------------------------------------------------------
 # Wrap-up
 # ---------------------------------------------------------------------------
@@ -1727,6 +1746,7 @@ main() {
 	[ "$CHANGED" = 1 ] && ok installed "$INSTALLED"
 
 	check_tools
+	update_rules
 	path_advice
 	shadow_check
 	summary

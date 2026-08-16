@@ -30,6 +30,27 @@ if (($script:MockScoopArgs -join ' ') -ne 'install upx 7zip') {
 }
 Write-Host 'ok - optional tools are limited to available packages'
 
+# WinGet covers the same tool set when Scoop is unavailable. Keep this as a
+# separate pass so the preference for Scoop above cannot hide missing WinGet
+# mappings.
+$script:MockWingetCalls = @()
+function Test-ScoopPackage([string]$Name) { return $false }
+function Test-WingetPackage([string]$Id) {
+	return $Id -in @('Rizin.Rizin', 'UPX.UPX', '7zip.7zip', 'dscharrer.innoextract')
+}
+function winget { $script:MockWingetCalls += ($args -join ' ') }
+Show-OptionalTools
+$expectedWingetCalls = @(
+	'install --id Rizin.Rizin --exact --accept-package-agreements --accept-source-agreements',
+	'install --id UPX.UPX --exact --accept-package-agreements --accept-source-agreements',
+	'install --id 7zip.7zip --exact --accept-package-agreements --accept-source-agreements',
+	'install --id dscharrer.innoextract --exact --accept-package-agreements --accept-source-agreements'
+)
+if (($script:MockWingetCalls -join "`n") -ne ($expectedWingetCalls -join "`n")) {
+	throw "optional tools did not use the complete winget mapping:`n$($script:MockWingetCalls -join "`n")"
+}
+Write-Host 'ok - optional tools are complete with winget'
+
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "atomscan-installer-test-$([guid]::NewGuid().ToString('N'))"
 $oldLocalAppData = $env:LOCALAPPDATA
 $script:InstallDir = Join-Path $root 'bin'
@@ -105,6 +126,7 @@ public static class FixtureTwo {
 	$Dir = $integrationDir
 	$Method = 'Binary'
 	$NoTools = $true
+	$NoUpdate = $true
 	$NoPath = $true
 	$Force = $false
 	$Quiet = $true
@@ -177,6 +199,7 @@ public static class FixtureTwo {
 	Remove-Item Function:\cargo -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\rustc -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\scoop -Force -ErrorAction SilentlyContinue
+	Remove-Item Function:\winget -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\Test-Tool -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\Test-ScoopPackage -Force -ErrorAction SilentlyContinue
 	Remove-Item Function:\Test-WingetPackage -Force -ErrorAction SilentlyContinue

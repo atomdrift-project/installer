@@ -218,7 +218,7 @@ jobs:
         shell: powershell
         run: |
           $destination = Join-Path $env:RUNNER_TEMP 'atomscan-live-bin'
-          & .\scan.ps1 -Dir $destination -Method Binary -NoTools -NoPath
+          & .\scan.ps1 -Dir $destination -Method Binary -NoTools -NoUpdate -NoPath
           $installed = Join-Path $destination 'atomscan.exe'
           if (-not (Test-Path -LiteralPath $installed)) {
             throw "installer did not create $installed"
