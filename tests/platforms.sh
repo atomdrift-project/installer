@@ -22,16 +22,18 @@ setup_style
 # to scan.ps1; every other published target belongs to this shell script.
 SCAN_WORKFLOW=${SCAN_RELEASE_WORKFLOW:-"$TEST_ROOT/../scan/.github/workflows/release.yml"}
 if [ -f "$SCAN_WORKFLOW" ]; then
+	# Each publish step passes its inventory as an `expected: >-` block; the
+	# release publishes their union.
 	expected_targets=$(awk '
-		/^[[:space:]]+EXPECTED: >-/ { inventory = 1; next }
-		inventory && /^[[:space:]]+REQUESTED_TARGET:/ { exit }
+		/^[[:space:]]+expected: >-/ { inventory = 1; next }
+		inventory && !/^[[:space:]]+[[:alnum:]_]+-[[:alnum:]_-]+/ { inventory = 0 }
 		inventory {
 			for (i = 1; i <= NF; i++) {
 				if ($i ~ /^[[:alnum:]_]+-[[:alnum:]_-]+-[[:alnum:]_-]+/) print $i
 			}
-		}' "$SCAN_WORKFLOW" | sort)
+		}' "$SCAN_WORKFLOW" | grep -v -- '-pc-windows-' | sort -u)
 	# shellcheck disable=SC2086 # TARGETS is intentionally a newline-separated list.
-	installer_targets=$(printf '%s\n' $TARGETS x86_64-pc-windows-msvc aarch64-pc-windows-msvc | sort)
+	installer_targets=$(printf '%s\n' $TARGETS | sort)
 	[ "$installer_targets" = "$expected_targets" ] || fail 'installer target list has drifted from release.yml'
 	printf 'ok - installer target inventory matches release.yml\n'
 fi
@@ -100,15 +102,15 @@ assert_platform 'Linux/openEuler x86_64 glibc' Linux x86_64 GNU/Linux test 0 0 x
 assert_platform 'Linux arm64 glibc' Linux arm64 GNU/Linux test 0 0 aarch64-unknown-linux-gnu
 assert_platform 'Linux x86_64 musl' Linux x86_64 GNU/Linux test 0 1 x86_64-unknown-linux-musl
 assert_platform 'Linux arm64 musl' Linux aarch64 GNU/Linux test 0 1 aarch64-unknown-linux-musl
-assert_platform 'Linux ARMv6 glibc' Linux armv6l GNU/Linux test 0 0 arm-unknown-linux-musleabihf
-assert_platform 'Linux ARMv6 musl' Linux armv6l GNU/Linux test 0 1 arm-unknown-linux-musleabihf
-assert_platform 'Linux ARMv7 glibc' Linux armv7l GNU/Linux test 0 0 armv7-unknown-linux-musleabihf
-assert_platform 'Linux ARMv7 musl' Linux armv7l GNU/Linux test 0 1 armv7-unknown-linux-musleabihf
-assert_platform 'Linux 32-bit ARMv8 userland' Linux armv8l GNU/Linux test 0 0 armv7-unknown-linux-musleabihf
+assert_source_platform 'Linux ARMv6 glibc' Linux armv6l GNU/Linux test 0 0 arm-unknown-linux-musleabihf
+assert_source_platform 'Linux ARMv6 musl' Linux armv6l GNU/Linux test 0 1 arm-unknown-linux-musleabihf
+assert_source_platform 'Linux ARMv7 glibc' Linux armv7l GNU/Linux test 0 0 armv7-unknown-linux-musleabihf
+assert_source_platform 'Linux ARMv7 musl' Linux armv7l GNU/Linux test 0 1 armv7-unknown-linux-musleabihf
+assert_source_platform 'Linux 32-bit ARMv8 userland' Linux armv8l GNU/Linux test 0 0 armv7-unknown-linux-musleabihf
 assert_platform 'Linux LoongArch64 glibc' Linux loongarch64 GNU/Linux test 0 0 loongarch64-unknown-linux-musl
 assert_platform 'Linux LoongArch64 musl' Linux loongarch64 GNU/Linux test 0 1 loongarch64-unknown-linux-musl
 assert_platform 'Android' Linux x86_64 Android test 0 0 x86_64-unknown-linux-musl
-assert_platform 'Android ARMv7' Linux armv7l Android test 0 0 armv7-unknown-linux-musleabihf
+assert_source_platform 'Android ARMv7' Linux armv7l Android test 0 0 armv7-unknown-linux-musleabihf
 assert_platform 'Linux s390x' Linux s390x GNU/Linux test 0 0 s390x-unknown-linux-gnu
 assert_platform 'Linux riscv64' Linux riscv64 GNU/Linux test 0 0 riscv64gc-unknown-linux-gnu
 assert_platform 'Linux powerpc64le' Linux ppc64le GNU/Linux test 0 0 powerpc64le-unknown-linux-gnu
@@ -124,7 +126,7 @@ assert_source_platform 'DragonFly BSD' DragonFly x86_64 DragonFly test 0 0 x86_6
 assert_source_platform 'experimental Haiku mapping' Haiku x86_64 Haiku test 0 0 x86_64-unknown-haiku
 assert_source_platform 'experimental GNU/Hurd mapping' GNU x86_64 GNU test 0 0 x86_64-unknown-hurd-gnu
 assert_platform 'illumos/OpenIndiana/Tribblix' SunOS i86pc illumos 'omnios-r151058' 0 0 x86_64-unknown-illumos
-assert_platform 'Solaris' SunOS i86pc Solaris '11.4' 0 0 x86_64-pc-solaris
+assert_source_platform 'Solaris' SunOS i86pc Solaris '11.4' 0 0 x86_64-pc-solaris
 
 MOCK_OS=Linux MOCK_ARCH=mipsel MOCK_OPERATING=GNU/Linux MOCK_VERSION=test
 MOCK_ARM64=0 MOCK_MUSL=0

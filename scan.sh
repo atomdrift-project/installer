@@ -58,8 +58,6 @@ x86_64-unknown-linux-gnu
 aarch64-unknown-linux-gnu
 x86_64-unknown-linux-musl
 aarch64-unknown-linux-musl
-arm-unknown-linux-musleabihf
-armv7-unknown-linux-musleabihf
 loongarch64-unknown-linux-musl
 s390x-unknown-linux-gnu
 riscv64gc-unknown-linux-gnu
@@ -70,7 +68,6 @@ x86_64-unknown-freebsd
 x86_64-unknown-openbsd
 x86_64-unknown-netbsd
 x86_64-unknown-illumos
-x86_64-pc-solaris
 "
 
 # Settings, overridable by flag or environment.
