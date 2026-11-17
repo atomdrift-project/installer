@@ -18,24 +18,31 @@ fail() {
 setup_style
 
 # In the monorepo checkout, fail immediately if Scan's release inventory gains
-# or loses a target without a corresponding installer update. Windows belongs
-# to scan.ps1; every other published target belongs to this shell script.
+# or loses a target without a corresponding installer update. Windows targets
+# belong to scan.ps1; every other published target belongs to this shell script.
 SCAN_WORKFLOW=${SCAN_RELEASE_WORKFLOW:-"$TEST_ROOT/../scan/.github/workflows/release.yml"}
 if [ -f "$SCAN_WORKFLOW" ]; then
 	# Each publish step passes its inventory as an `expected: >-` block; the
 	# release publishes their union.
-	expected_targets=$(awk '
+	published=$(awk '
 		/^[[:space:]]+expected: >-/ { inventory = 1; next }
 		inventory && !/^[[:space:]]+[[:alnum:]_]+-[[:alnum:]_-]+/ { inventory = 0 }
 		inventory {
 			for (i = 1; i <= NF; i++) {
 				if ($i ~ /^[[:alnum:]_]+-[[:alnum:]_-]+-[[:alnum:]_-]+/) print $i
 			}
-		}' "$SCAN_WORKFLOW" | grep -v -- '-pc-windows-' | sort -u)
+		}' "$SCAN_WORKFLOW" | sort -u)
+	expected_targets=$(printf '%s\n' "$published" | grep -v -- '-pc-windows-')
 	# shellcheck disable=SC2086 # TARGETS is intentionally a newline-separated list.
 	installer_targets=$(printf '%s\n' $TARGETS | sort)
 	[ "$installer_targets" = "$expected_targets" ] || fail 'installer target list has drifted from release.yml'
 	printf 'ok - installer target inventory matches release.yml\n'
+
+	expected_windows=$(printf '%s\n' "$published" | grep -- '-pc-windows-' || :)
+	# shellcheck disable=SC1091,SC2086,SC2153 # the config is sh and sets WINDOWS_TARGETS; the list splits by design.
+	windows_targets=$(. "$TEST_ROOT/products/scan.conf" && printf '%s\n' $WINDOWS_TARGETS | sort)
+	[ "$windows_targets" = "$expected_windows" ] || fail 'scan.ps1 target list has drifted from release.yml'
+	printf 'ok - Windows target inventory matches release.yml\n'
 fi
 
 MOCK_OS=unknown
@@ -140,6 +147,6 @@ if windows_output=$(detect_platform 2>&1); then
 	fail 'Windows shell did not stop and hand off to PowerShell'
 fi
 case $windows_output in
-*install.ps1*) printf 'ok - Windows shell hands off to install.ps1\n' ;;
-*) fail 'Windows handoff did not mention install.ps1' ;;
+*'irm https://install.atomdrift.org/scan.ps1 | iex'*) printf 'ok - Windows shell hands off to scan.ps1\n' ;;
+*) fail 'Windows handoff did not give the scan.ps1 command' ;;
 esac

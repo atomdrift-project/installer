@@ -307,7 +307,13 @@
           <div class="terminal">
             <div class="command-row">
               <code><span class="command-prefix">curl -fsSL </span><span class="command-target">https://install.atomdrift.org/cleave.sh | sh</span></code>
-              <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/cleave.sh | sh" aria-label="Copy the cleave install command">copy</button>
+              <button class="copy-button" type="button" data-copy="curl -fsSL https://install.atomdrift.org/cleave.sh | sh" aria-label="Copy the cleave install command for macOS, Linux, and Unix">copy</button>
+            </div>
+          </div>
+          <div class="terminal terminal-windows">
+            <div class="command-row">
+              <code><span class="command-prefix">irm </span><span class="command-target">https://install.atomdrift.org/cleave.ps1 | iex</span></code>
+              <button class="copy-button" type="button" data-copy="irm https://install.atomdrift.org/cleave.ps1 | iex" aria-label="Copy the cleave install command for Windows PowerShell">copy</button>
             </div>
           </div>
           <p class="card-meta">Uses Homebrew when available · <a href="https://github.com/atomdrift-project/cleave/releases/latest">releases</a> · <a href="https://github.com/atomdrift-project/cleave">source</a></p>
@@ -384,10 +390,10 @@
         </div>
         <div>
           <dt>Runs almost anywhere</dt>
-          <dd>macOS · Linux · BSD · Solaris / illumos · Android, and Windows for Scan.<br>x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE</dd>
+          <dd>macOS · Linux · BSD · Solaris / illumos · Android, and Windows for Scan and cleave.<br>x86-64 · ARM64 · ARMv6/ARMv7 hard-float · LoongArch64 · s390x · RISC-V 64 · POWER64LE</dd>
         </div>
       </dl>
-      <p class="fine-print">Read before you pipe: <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">scan.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/cleave.sh">cleave.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/isomer.sh">isomer.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/hood.sh">hood.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">scan.ps1</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/action.sh">action.sh</a>. Every installer takes <code>--help</code>, <code>--dir</code>, <code>--version</code>, and <code>--method</code>; re-running one is a no-op when it is already current.</p>
+      <p class="fine-print">Read before you pipe: <a href="https://github.com/atomdrift-project/installer/blob/main/scan.sh">scan.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/cleave.sh">cleave.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/isomer.sh">isomer.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/hood.sh">hood.sh</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/scan.ps1">scan.ps1</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/cleave.ps1">cleave.ps1</a> · <a href="https://github.com/atomdrift-project/installer/blob/main/action.sh">action.sh</a>. Every installer takes <code>--help</code>, <code>--dir</code>, <code>--version</code>, and <code>--method</code>; re-running one is a no-op when it is already current.</p>
     </section>
   </main>
 

@@ -45,8 +45,7 @@ jobs:
 
       - name: Lint
         run: |
-          shellcheck -s sh scan.sh cleave.sh isomer.sh hood.sh action.sh tools/render.sh tests/*.sh
-          sh tests/workflow.sh
+          make lint
 
       - name: Test the generated installers
         run: |
@@ -183,10 +182,23 @@ jobs:
       - run: sh tests/native-platform.sh aarch64-apple-darwin
       - run: sh tests/install-dir.sh
 
+  # One matrix row per generated PowerShell installer (WINDOWS_PRODUCTS in the
+  # Makefile). Matrix values reach scripts through env, never inline.
   windows:
-    name: Windows / PowerShell 5.1
+    name: Windows / PowerShell 5.1 / ${{ matrix.product }}
     runs-on: windows-2025
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - product: scan
+            bin: atomscan
+          - product: cleave
+            bin: cleave
+    env:
+      PRODUCT: ${{ matrix.product }}
+      BIN: ${{ matrix.bin }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -198,41 +210,47 @@ jobs:
           $tokens = $null
           $errors = $null
           [void][System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path .\scan.ps1).Path, [ref]$tokens, [ref]$errors)
+            (Resolve-Path ".\$env:PRODUCT.ps1").Path, [ref]$tokens, [ref]$errors)
           if ($errors -and $errors.Count) {
             $errors | Format-List -Force
-            throw "scan.ps1 has $($errors.Count) parser error(s)"
+            throw "$env:PRODUCT.ps1 has $($errors.Count) parser error(s)"
           }
 
       - name: Native install smoke test
         shell: powershell
         env:
           EXPECTED_TARGET: x86_64-pc-windows-msvc
-        run: .\tests\windows.ps1
+        run: .\tests\windows.ps1 -Product $env:PRODUCT
 
       # The fixture test above is deterministic and exercises failure paths.
-      # This one closes the integration gap: resolve the actual latest Scan
-      # release, download its Windows asset and SHA256SUMS, verify it, install
-      # it without touching user PATH, then execute the installed binary.
+      # This one closes the integration gap: resolve the actual latest release,
+      # download its Windows asset and SHA256SUMS, verify it, install it without
+      # touching user PATH, then execute the installed binary.
       - name: Live release install
         shell: powershell
         run: |
-          $destination = Join-Path $env:RUNNER_TEMP 'atomscan-live-bin'
-          & .\scan.ps1 -Dir $destination -Method Binary -NoTools -NoUpdate -NoPath
-          $installed = Join-Path $destination 'atomscan.exe'
+          $destination = Join-Path $env:RUNNER_TEMP "$env:BIN-live-bin"
+          & ".\$env:PRODUCT.ps1" -Dir $destination -Method Binary -NoTools -NoUpdate -NoPath
+          $installed = Join-Path $destination "$env:BIN.exe"
           if (-not (Test-Path -LiteralPath $installed)) {
             throw "installer did not create $installed"
           }
           $version = & $installed --version
-          if ($LASTEXITCODE -ne 0 -or "$version" -notmatch '^atomscan ') {
+          if ($LASTEXITCODE -ne 0 -or "$version" -notmatch "^$env:BIN ") {
             throw "installed binary failed its version smoke test: $version"
           }
           Write-Host "ok - live release install -> $version"
 
   windows-arm64:
-    name: Windows / ARM64
+    name: Windows / ARM64 / ${{ matrix.product }}
     runs-on: windows-11-arm
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        product: [scan, cleave]
+    env:
+      PRODUCT: ${{ matrix.product }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -244,17 +262,18 @@ jobs:
           $tokens = $null
           $errors = $null
           [void][System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path .\scan.ps1).Path, [ref]$tokens, [ref]$errors)
+            (Resolve-Path ".\$env:PRODUCT.ps1").Path, [ref]$tokens, [ref]$errors)
           if ($errors -and $errors.Count) {
             $errors | Format-List -Force
-            throw "scan.ps1 has $($errors.Count) parser error(s)"
+            throw "$env:PRODUCT.ps1 has $($errors.Count) parser error(s)"
           }
 
+      # No tool publishes Windows ARM64 by default, so each is a source install.
       - name: Native install smoke test
         shell: pwsh
         env:
           EXPECTED_TARGET: aarch64-pc-windows-msvc
-        run: .\tests\windows.ps1
+        run: .\tests\windows.ps1 -Product $env:PRODUCT -Unpublished
 
   bsd:
     name: BSD family

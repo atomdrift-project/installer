@@ -1,8 +1,22 @@
+# Exercises one generated Windows installer natively. -Unpublished asserts that
+# this machine's target has no release binary, so the installer takes the
+# source path.
+param(
+	[ValidatePattern('^[a-z][a-z0-9-]*$')]
+	[string]$Product = 'scan',
+	[switch]$Unpublished
+)
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$env:ATOMSCAN_INSTALLER_TESTING = '1'
-. (Join-Path $PSScriptRoot '..\scan.ps1')
+# An installer runs itself on load unless <ENV>_INSTALLER_TESTING is set, and
+# ENV comes from the same config the installer was rendered from.
+$conf = Join-Path $PSScriptRoot "..\products\$Product.conf"
+$envLine = Select-String -LiteralPath $conf -Pattern '^ENV="([A-Z0-9_]+)"$' | Select-Object -First 1
+if (-not $envLine) { throw "$conf sets no ENV prefix" }
+Set-Item -Path "env:$($envLine.Matches[0].Groups[1].Value)_INSTALLER_TESTING" -Value '1'
+. (Join-Path $PSScriptRoot "..\$Product.ps1")
 
 Initialize-Style
 Resolve-Platform
@@ -10,10 +24,13 @@ $expectedTarget = if ($env:EXPECTED_TARGET) { $env:EXPECTED_TARGET } else { 'x86
 if ($script:Self -ne $expectedTarget) {
 	throw "detected $($script:Self), expected $expectedTarget"
 }
-if ($script:Target -ne $script:Self) {
-	throw "$($script:Self) is not release-backed"
+if ($Unpublished) {
+	if ($script:Target) { throw "$($script:Self) is release-backed; drop -Unpublished" }
+	Write-Host "ok - native platform -> $($script:Self) (source build)"
+} else {
+	if ($script:Target -ne $script:Self) { throw "$($script:Self) is not release-backed" }
+	Write-Host "ok - native platform -> $($script:Self)"
 }
-Write-Host "ok - native platform -> $($script:Self)"
 
 # Available optional tools are installed in one idempotent package-manager
 # operation; missing repository entries are not guessed or recommended.
@@ -51,30 +68,27 @@ if (($script:MockWingetCalls -join "`n") -ne ($expectedWingetCalls -join "`n")) 
 }
 Write-Host 'ok - optional tools are complete with winget'
 
-$root = Join-Path ([System.IO.Path]::GetTempPath()) "atomscan-installer-test-$([guid]::NewGuid().ToString('N'))"
+$root = Join-Path ([System.IO.Path]::GetTempPath()) "$BinName-installer-test-$([guid]::NewGuid().ToString('N'))"
 $oldLocalAppData = $env:LOCALAPPDATA
 $script:InstallDir = Join-Path $root 'bin'
 New-Item -ItemType Directory -Force -Path $script:InstallDir | Out-Null
 
 try {
-	$fixtureOne = Join-Path $root 'atomscan-one.exe'
-	$fixtureTwo = Join-Path $root 'atomscan-two.exe'
-	$sourceOne = @'
-using System;
-public static class FixtureOne {
-    public static void Main() { Console.WriteLine("atomscan 9.9.9"); }
-}
-'@
-	$sourceTwo = @'
-using System;
-public static class FixtureTwo {
-    public static void Main() { Console.WriteLine("atomscan 9.9.10"); }
-}
-'@
-	Add-Type -TypeDefinition $sourceOne -OutputAssembly $fixtureOne -OutputType ConsoleApplication
-	Add-Type -TypeDefinition $sourceTwo -OutputAssembly $fixtureTwo -OutputType ConsoleApplication
+	# Fixture executables that print a version, compiled by Windows PowerShell:
+	# PowerShell 7's Add-Type cannot emit a console application, and every
+	# Windows release ships powershell.exe whichever shell runs this test.
+	$fixtureOne = Join-Path $root "$BinName-one.exe"
+	$fixtureTwo = Join-Path $root "$BinName-two.exe"
+	foreach ($fixture in @(@($fixtureOne, '9.9.9'), @($fixtureTwo, '9.9.10'))) {
+		$exe, $fixtureVersion = $fixture
+		$cs = [System.IO.Path]::ChangeExtension($exe, '.cs')
+		[System.IO.File]::WriteAllText($cs,
+			"public static class Fixture { public static void Main() { System.Console.WriteLine(`"$BinName $fixtureVersion`"); } }")
+		& powershell.exe -NoProfile -NonInteractive -Command "Add-Type -LiteralPath '$cs' -OutputAssembly '$exe' -OutputType ConsoleApplication"
+		if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $exe)) { throw "could not compile $exe" }
+	}
 
-	$name = 'atomscan-fixture.exe'
+	$name = "$BinName-fixture.exe"
 	$hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $fixtureOne).Hash.ToLowerInvariant()
 	$sums = Join-Path $root 'SHA256SUMS'
 	[System.IO.File]::WriteAllText($sums, "$hash  $name`n")
@@ -94,20 +108,23 @@ public static class FixtureTwo {
 	# extraction, executable validation, destination handling, and summaries.
 	$payload = Join-Path $root 'payload'
 	New-Item -ItemType Directory -Force -Path $payload | Out-Null
-	Copy-Item -LiteralPath $fixtureTwo -Destination (Join-Path $payload 'atomscan.exe')
-	$fixtureArchiveName = "atomscan-9.9.10-$expectedTarget.tar.gz"
+	Copy-Item -LiteralPath $fixtureTwo -Destination (Join-Path $payload $ExeName)
+	$fixtureArchiveName = "$BinName-9.9.10-$expectedTarget.tar.gz"
 	$fixtureArchivePath = Join-Path $root $fixtureArchiveName
-	& tar.exe -czf $fixtureArchivePath -C $payload atomscan.exe
+	& tar.exe -czf $fixtureArchivePath -C $payload $ExeName
 	if ($LASTEXITCODE -ne 0) { throw 'could not build Windows release fixture' }
 	$fixtureArchiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $fixtureArchivePath).Hash.ToLowerInvariant()
 	$releaseSums = Join-Path $root 'release-SHA256SUMS'
 	[System.IO.File]::WriteAllText($releaseSums, "$fixtureArchiveHash  $fixtureArchiveName`n")
 
+	# The fixture release publishes this machine's target, whether or not the
+	# real releases do.
+	$Targets = @($expectedTarget)
 	function Test-UrlExists([string]$Url) { return $true }
 	function Test-Provenance([string]$File) { return $false }
 	function cosign { return }
 	function Test-SigstoreManifest([string]$Manifest, [string]$Bundle, [string]$ReleaseVersion) {
-		return 'https://github.com/atomdrift-project/scan/.github/workflows/release.yml@refs/tags/v9.9.10'
+		return "https://github.com/$Repo/.github/workflows/release.yml@refs/tags/v9.9.10"
 	}
 	function Save-Url([string]$Url, [string]$Path, [string]$Label) {
 		if ($Url.EndsWith('/SHA256SUMS')) {
@@ -131,21 +148,31 @@ public static class FixtureTwo {
 	$Force = $false
 	$Quiet = $true
 	Invoke-Install
-	$expectedInstall = Join-Path $integrationDir 'atomscan.exe'
+	$expectedInstall = Join-Path $integrationDir $ExeName
 	if ($script:Installed -ne $expectedInstall) { throw "installed at unexpected path $($script:Installed)" }
 	if ((Get-InstalledVersion $script:Installed) -ne '9.9.10') { throw 'end-to-end fixture does not run' }
 	Write-Host "ok - end-to-end binary install -> $($script:Installed)"
 
+	# The post-install update and the summary are rendered per product: the
+	# update command may be empty and the examples come from the config, so
+	# run both against the fixture under strict mode.
+	$NoUpdate = $false
+	Update-Rules
+	$Quiet = $false
+	Write-Summary
+	$Quiet = $true
+	Write-Host 'ok - post-install update and summary'
+
 	# Source checkouts are cloned into a unique sibling first. Exercise recovery
 	# from a pre-existing non-Git cache and reuse of the promoted checkout.
 	$env:LOCALAPPDATA = Join-Path $root 'local-app-data'
-	$sourceCache = Join-Path $env:LOCALAPPDATA 'atomdrift\scan-src'
+	$sourceCache = Join-Path $env:LOCALAPPDATA "atomdrift\$Product-src"
 	New-Item -ItemType Directory -Force -Path $sourceCache | Out-Null
 	[System.IO.File]::WriteAllText((Join-Path $sourceCache 'interrupted'), "partial`n")
 	$script:MockClones = 0
 	$script:MockFetches = 0
 	$script:MockCheckouts = 0
-	$script:MockOrigin = 'https://github.com/atomdrift-project/scan.git'
+	$script:MockOrigin = "https://github.com/$Repo.git"
 	function git {
 		if ($args[0] -eq 'clone') {
 			$mockDest = "$($args[-1])"
@@ -169,11 +196,11 @@ public static class FixtureTwo {
 	function cargo {
 		$mockBuilt = Join-Path (Get-Location) 'target\release'
 		New-Item -ItemType Directory -Force -Path $mockBuilt | Out-Null
-		Copy-Item -LiteralPath $fixtureOne -Destination (Join-Path $mockBuilt 'atomscan.exe') -Force
+		Copy-Item -LiteralPath $fixtureOne -Destination (Join-Path $mockBuilt $ExeName) -Force
 		$global:LASTEXITCODE = 0
 	}
 	function rustc {
-		Write-Output 'rustc 1.94.0 (test toolchain)'
+		Write-Output 'rustc 1.97.0 (test toolchain)'
 		$global:LASTEXITCODE = 0
 	}
 

@@ -1,5 +1,6 @@
-# The four Unix installers are generated: one template, one config per tool.
-# Edit templates/install.sh.in or products/<tool>.conf, then `make regen`.
+# Every installer is generated: one template per shell, one config per tool.
+# Edit templates/install.sh.in, templates/install.ps1.in, or
+# products/<tool>.conf, then `make regen`.
 #
 #   make regen    rewrite the installers from the template
 #   make check    fail if a checked-in installer is stale (what CI runs)
@@ -8,8 +9,10 @@
 #   make all      lint, check, and test
 
 PRODUCTS := scan cleave isomer hood
-INSTALLERS := $(addsuffix .sh,$(PRODUCTS))
-SOURCES := templates/install.sh.in tools/render.sh
+# Tools with a PowerShell installer; each needs WINDOWS_TARGETS in its config.
+WINDOWS_PRODUCTS := scan cleave
+SH_INSTALLERS := $(addsuffix .sh,$(PRODUCTS))
+INSTALLERS := $(SH_INSTALLERS) $(addsuffix .ps1,$(WINDOWS_PRODUCTS))
 SHELLS := sh dash ksh bash zsh
 
 .PHONY: all regen check lint test clean
@@ -18,18 +21,18 @@ all: lint check test
 
 # Always renders, and says what it did. Timestamp-driven prerequisites would let
 # make answer "nothing to be done" — technically true, unhelpful from a command
-# whose whole job is to rewrite these files. Rendering four scripts is cheap;
+# whose whole job is to rewrite these files. Rendering a few scripts is cheap;
 # wondering whether it ran is not. Unchanged output keeps its old file, so an
 # installer nobody edited keeps its mtime.
 regen:
-	@for p in $(PRODUCTS); do \
-		sh tools/render.sh $$p "$$p.sh.new" || exit 1; \
-		if cmp -s "$$p.sh" "$$p.sh.new" 2>/dev/null; then \
-			rm -f "$$p.sh.new"; \
-			printf 'unchanged  %s.sh\n' "$$p"; \
+	@for i in $(INSTALLERS); do \
+		sh tools/render.sh $$i "$$i.new" || exit 1; \
+		if cmp -s "$$i" "$$i.new" 2>/dev/null; then \
+			rm -f "$$i.new"; \
+			printf 'unchanged  %s\n' "$$i"; \
 		else \
-			mv -f "$$p.sh.new" "$$p.sh" || exit 1; \
-			printf 'wrote      %s.sh\n' "$$p"; \
+			mv -f "$$i.new" "$$i" || exit 1; \
+			printf 'wrote      %s\n' "$$i"; \
 		fi; \
 	done
 
@@ -37,21 +40,21 @@ regen:
 # repository, not the one the template would produce today.
 check:
 	@status=0; \
-	for p in $(PRODUCTS); do \
-		sh tools/render.sh $$p "$$p.sh.check" || exit 1; \
-		if cmp -s "$$p.sh" "$$p.sh.check"; then \
-			printf 'ok       %s.sh is current\n' "$$p"; \
+	for i in $(INSTALLERS); do \
+		sh tools/render.sh $$i "$$i.check" || exit 1; \
+		if cmp -s "$$i" "$$i.check"; then \
+			printf 'ok       %s is current\n' "$$i"; \
 		else \
-			printf 'stale    %s.sh differs from the template — run make regen\n' "$$p" >&2; \
-			diff -u "$$p.sh" "$$p.sh.check" || :; \
+			printf 'stale    %s differs from the template — run make regen\n' "$$i" >&2; \
+			diff -u "$$i" "$$i.check" || :; \
 			status=1; \
 		fi; \
-		rm -f "$$p.sh.check"; \
+		rm -f "$$i.check"; \
 	done; \
 	exit $$status
 
 lint:
-	shellcheck -s sh $(INSTALLERS) action.sh tools/render.sh tests/*.sh
+	shellcheck -s sh $(SH_INSTALLERS) action.sh tools/render.sh tests/*.sh
 	sh tests/workflow.sh
 
 # The suite drives scan.sh, which the template renders for every tool, so a
@@ -71,4 +74,4 @@ test:
 	sh tests/index.sh
 
 clean:
-	rm -f $(addsuffix .sh.check,$(PRODUCTS))
+	rm -f $(addsuffix .check,$(INSTALLERS)) $(addsuffix .new,$(INSTALLERS))

@@ -1191,7 +1191,7 @@ inspect_rust() {
 	case $ric_major:$ric_minor in
 	*[!0-9:]* | :* | *:) return 0 ;;
 	esac
-	if [ "$ric_major" -gt 1 ] || { [ "$ric_major" -eq 1 ] && [ "$ric_minor" -ge 94 ]; }; then
+	if [ "$ric_major" -gt 1 ] || { [ "$ric_major" -eq 1 ] && [ "$ric_minor" -ge 97 ]; }; then
 		RUST_COMPATIBLE=1
 	fi
 	return 0
@@ -1241,14 +1241,14 @@ install_source() {
 	use_current_if_exact && return 0
 
 	if ! command -v cargo >/dev/null 2>&1 || ! command -v rustc >/dev/null 2>&1; then
-		die "a source build needs Rust 1.94 or newer:
+		die "a source build needs Rust 1.97 or newer:
    $(rust_hint)
    then re-run this installer"
 	fi
 	RUST_VERSION=""
 	inspect_rust
 	if [ "$RUST_COMPATIBLE" != 1 ]; then
-		die "a source build needs Rust 1.94 or newer (found ${RUST_VERSION:-unknown}):
+		die "a source build needs Rust 1.97 or newer (found ${RUST_VERSION:-unknown}):
 	   $(rust_hint)
 	   then re-run this installer"
 	fi
@@ -1364,7 +1364,7 @@ install_source() {
 		SOURCE_STAGE=""
 	fi
 
-	step build "cargo build --release  ${C_DIM}(the analysis stack is large — expect minutes)${C_RESET}"
+	step build "cargo build --release  ${C_DIM}(the analysis stack is large; expect minutes)${C_RESET}"
 	(cd "$is_src" && cargo build --release --locked --bin "$BIN") || die "build failed in $is_src"
 	is_built="$is_src/target/release/$BIN"
 	[ -f "$is_built" ] || die "the build produced no $BIN"

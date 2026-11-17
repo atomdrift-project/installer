@@ -30,15 +30,17 @@ done
 
 # Collected rather than failed on inside the loop: the loop is the far side of a
 # pipe, so an exit there would end a subshell and leave the test passing.
-missing=$(grep -o 'install\.atomdrift\.org/[a-z-]*\.sh' "$PAGE" | cut -d/ -f2 | sort -u |
+missing=$(grep -oE 'install\.atomdrift\.org/[a-z-]+\.(sh|ps1)' "$PAGE" | cut -d/ -f2 | sort -u |
 	while IFS= read -r offered; do
 		[ -f "$TEST_ROOT/$offered" ] || printf ' %s' "$offered"
 	done)
 [ -z "$missing" ] || fail "page offers installers this repository does not have:$missing"
 
-# Scan is the only tool with a Windows installer, and PowerShell is how it is
-# reached: the shell installer refuses to run there and says so.
-assert_page_contains 'irm https://install.atomdrift.org/scan.ps1 | iex'
+# Every PowerShell installer needs its command on the page: PowerShell is how
+# Windows users reach one, since the shell installer refuses to run there.
+for ps1 in "$TEST_ROOT"/*.ps1; do
+	assert_page_contains "irm https://install.atomdrift.org/$(basename "$ps1") | iex"
+done
 assert_page_contains 'class="terminal terminal-windows"'
 assert_page_contains 'class="command-target"'
 

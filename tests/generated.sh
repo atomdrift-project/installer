@@ -29,14 +29,14 @@ for product in $products; do
 	installer="$TEST_ROOT/$product.sh"
 	[ -f "$installer" ] || fail "$product.sh is not checked in"
 
-	sh "$TEST_ROOT/tools/render.sh" "$product" "$TMP/$product.sh" ||
+	sh "$TEST_ROOT/tools/render.sh" "$product.sh" "$TMP/$product.sh" ||
 		fail "$product does not render"
 	cmp -s "$installer" "$TMP/$product.sh" ||
 		fail "$product.sh is stale — run make regen"
 
 	# Rendering twice from the same inputs must produce the same bytes, or
 	# `make check` becomes a coin toss and nobody trusts it.
-	sh "$TEST_ROOT/tools/render.sh" "$product" "$TMP/$product.again.sh"
+	sh "$TEST_ROOT/tools/render.sh" "$product.sh" "$TMP/$product.again.sh"
 	cmp -s "$TMP/$product.sh" "$TMP/$product.again.sh" ||
 		fail "$product renders differently on a second run"
 
@@ -80,3 +80,59 @@ for product in $products; do
 done
 
 printf 'ok - generated installers are current, reproducible, and runnable:%s\n' "$products"
+
+# PowerShell installers. This shell cannot run them — tests/windows.ps1 does
+# that on Windows — so check what generation alone decides.
+windows=""
+for product in $products; do
+	conf="$TEST_ROOT/products/$product.conf"
+	if [ ! -f "$TEST_ROOT/$product.ps1" ]; then
+		# A Unix installer must not send Windows users to a script that is not
+		# there, and a config must not describe one nobody renders.
+		if grep -q "$product\.ps1" "$conf"; then
+			fail "$product.conf points Windows users at $product.ps1, which is not checked in"
+		fi
+		if grep -q '^WINDOWS_TARGETS=' "$conf"; then
+			fail "$product.conf sets WINDOWS_TARGETS, but $product.ps1 is not checked in"
+		fi
+		continue
+	fi
+	windows="$windows $product"
+	installer="$TEST_ROOT/$product.ps1"
+	grep -q "irm https://install.atomdrift.org/$product.ps1 | iex" "$conf" ||
+		fail "$product.sh does not point Windows users at $product.ps1"
+
+	sh "$TEST_ROOT/tools/render.sh" "$product.ps1" "$TMP/$product.ps1" ||
+		fail "$product.ps1 does not render"
+	cmp -s "$installer" "$TMP/$product.ps1" ||
+		fail "$product.ps1 is stale — run make regen"
+	sh "$TEST_ROOT/tools/render.sh" "$product.ps1" "$TMP/$product.again.ps1"
+	cmp -s "$TMP/$product.ps1" "$TMP/$product.again.ps1" ||
+		fail "$product.ps1 renders differently on a second run"
+
+	if grep -q '@[A-Z_][A-Z_]*@' "$installer"; then
+		fail "$product.ps1 still contains an unsubstituted token"
+	fi
+	# Windows PowerShell 5.1 reads a script without a byte-order mark in the
+	# legacy code page, so anything outside ASCII arrives mangled.
+	if LC_ALL=C grep -q '[^	 -~]' "$installer"; then
+		fail "$product.ps1 contains non-ASCII bytes"
+	fi
+	grep -q "install.atomdrift.org/$product.ps1" "$installer" ||
+		fail "$product.ps1 does not name its own install URL"
+
+	# Every Windows target has to be a Windows triple: the installer only ever
+	# detects those, so anything else is dead weight or a typo.
+	# shellcheck disable=SC1090 # the product's own config, by design.
+	windows_targets=$(. "$conf" && printf '%s' "${WINDOWS_TARGETS:-}")
+	[ -n "$windows_targets" ] || fail "$product.conf sets no WINDOWS_TARGETS"
+	for target in $windows_targets; do
+		case $target in
+		*-pc-windows-*) ;;
+		*) fail "$product.ps1 lists a non-Windows target: $target" ;;
+		esac
+	done
+done
+[ -n "$windows" ] || fail 'no PowerShell installers found'
+
+printf 'ok - PowerShell installers are current, reproducible, and ASCII:%s\n' "$windows"

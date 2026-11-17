@@ -28,7 +28,7 @@ MOCK_CLONE_FAIL=0
 MOCK_FETCH_FAIL=0
 MOCK_ORIGIN='https://github.com/atomdrift-project/scan.git'
 MOCK_PROMOTE_FAIL=0
-MOCK_RUST_VERSION=1.94.0
+MOCK_RUST_VERSION=1.97.0
 
 git() {
 	case $1 in
@@ -128,7 +128,7 @@ printf '%s\n' 'atomscan 2.5.0'
 EOF
 chmod 755 "$current_dir/atomscan"
 MOCK_CURRENT="$current_dir/atomscan"
-MOCK_RUST_VERSION=1.93.9
+MOCK_RUST_VERSION=1.96.9
 OPT_FORCE=0
 INSTALL_DIR=""
 install_source
@@ -145,7 +145,7 @@ OPT_FORCE=1
 
 # Reject an old compiler before resolving a release, preparing a destination,
 # requesting privilege, or touching the cache.
-MOCK_RUST_VERSION=1.93.9
+MOCK_RUST_VERSION=1.96.9
 INSTALL_DIR=""
 old_rust_log="$fixture_root/old-rust.log"
 if (install_source >"$old_rust_log" 2>&1); then
@@ -153,12 +153,12 @@ if (install_source >"$old_rust_log" 2>&1); then
 fi
 old_rust_output=$(sed -n '1,20p' "$old_rust_log")
 case $old_rust_output in
-*'Rust 1.94 or newer (found 1.93.9)'*'then re-run this installer'*) : ;;
+*'Rust 1.97 or newer (found 1.96.9)'*'then re-run this installer'*) : ;;
 *) fail 'old-Rust error did not report the requirement and recovery action' ;;
 esac
 [ ! -e "$source_dir" ] || fail 'old Rust toolchain touched the source cache'
 [ ! -e "$destination_marker" ] || fail 'old Rust toolchain prepared an install destination'
-MOCK_RUST_VERSION=1.94.0
+MOCK_RUST_VERSION=1.97.0
 INSTALL_DIR="$fixture_root/bin"
 
 # Even the initial clone is staged, so interruption leaves no poisoned cache.
